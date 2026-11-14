@@ -723,7 +723,20 @@ export function TimelineView(props: TimelineViewProps) {
         </div>
       </div>
 
-      <div className={'tl-body' + (draggingView ? ' dragging' : '') + (panning ? ' panning' : '')}>
+      {/*
+        `--lane-h` lets the scrollport stop above the control lane. The lane is
+        absolutely positioned over the bottom of the body, so without it the
+        last rows of the piano roll sat permanently behind the lane and could
+        not be scrolled into view.
+      */}
+      <div
+        className={'tl-body' + (draggingView ? ' dragging' : '') + (panning ? ' panning' : '')}
+        style={
+          {
+            '--lane-h': `${props.renderControlLane ? (props.laneHeight ?? 0) : 0}px`,
+          } as React.CSSProperties
+        }
+      >
         <div
           className="tl-scroll"
           ref={scrollRef}

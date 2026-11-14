@@ -959,9 +959,18 @@ input.filter:focus {
   min-height: 0;
 }
 
+/*
+ * Stop above the control lane.
+ *
+ * The lane is absolutely positioned over the bottom of the body, so with
+ * `inset: 0` the scroll area ran underneath it and the last rows of the piano
+ * roll — and the end of the arrangement — could not be scrolled clear of it.
+ * The body exposes its lane height as `--lane-h`, so the scrollport simply ends
+ * where the lane begins.
+ */
 .tl-scroll {
   position: absolute;
-  inset: 0;
+  inset: 0 0 var(--lane-h, 0px) 0;
   overflow: auto;
 }
 
