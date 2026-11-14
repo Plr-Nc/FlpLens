@@ -123,7 +123,15 @@ export function ExportMidi(props: {
       const rect = triggerRef.current?.getBoundingClientRect();
       if (!rect) return;
       const width = 320;
-      const left = Math.min(Math.max(8, rect.left), window.innerWidth - width - 8);
+      /*
+       * Open to the *right* of the button, not under its left edge. The piano
+       * roll's key column is a 34 px sticky strip at the very left of the
+       * content area, directly below the button — a panel anchored at the
+       * button's left edge covered the top of it (the "ABC labels are hidden by
+       * MIDI" report). Starting at the button's right edge clears that column.
+       */
+      const preferred = rect.right + 6;
+      const left = Math.min(Math.max(8, preferred), window.innerWidth - width - 8);
       setAnchor({ left, top: Math.min(rect.bottom + 6, window.innerHeight - 200) });
     };
     place();
