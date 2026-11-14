@@ -2,17 +2,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { parseFlp } from './flp/project.ts';
 import type { Project } from './flp/project.ts';
 import { buildReport, hasFatal } from './flp/diagnostics.ts';
-import { ChannelList, Overview, PatternPicker } from './views/Panels.tsx';
+import { ChannelList, Overview } from './views/Panels.tsx';
 import { Arrangement } from './views/Arrangement.tsx';
-import { PianoRoll } from './views/PianoRoll.tsx';
+import { StyleView } from './views/StyleView.tsx';
 import { Mixer } from './views/Mixer.tsx';
+import { Browser } from './views/Browser.tsx';
+import { SplitPane } from './components/SplitPane.tsx';
+import { Settings } from './components/Settings.tsx';
 
-type Tab = 'overview' | 'arrangement' | 'patterns' | 'mixer' | 'diagnostics';
+type Tab = 'arrangement' | 'style' | 'mixer' | 'overview' | 'diagnostics';
 
 export function App() {
   const [project, setProject] = useState<Project | null>(null);
   const [fileName, setFileName] = useState('');
-  const [tab, setTab] = useState<Tab>('overview');
+  const [tab, setTab] = useState<Tab>('arrangement');
   const [selectedChannel, setSelectedChannel] = useState<number | null>(null);
   const [selectedPattern, setSelectedPattern] = useState<number | null>(null);
   const [arrangement, setArrangement] = useState(0);
@@ -55,7 +58,7 @@ export function App() {
         null,
       );
       setSelectedPattern(richest?.index ?? null);
-      setTab(parsed.diagnostics.issues.some((issue) => issue.severity === 'fatal') ? 'diagnostics' : 'overview');
+      setTab(hasFatal(parsed.diagnostics) ? 'diagnostics' : 'arrangement');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
       setProject(null);
@@ -142,10 +145,10 @@ export function App() {
       }
       if (!project) return;
       const tabs: Record<string, Tab> = {
-        '1': 'overview',
-        '2': 'arrangement',
-        '3': 'patterns',
-        '4': 'mixer',
+        '1': 'arrangement',
+        '2': 'style',
+        '3': 'mixer',
+        '4': 'overview',
         '5': 'diagnostics',
       };
       const next = tabs[event.key];
@@ -166,6 +169,7 @@ export function App() {
         {project && fatal > 0 && <span className="badge warn">{fatal} 个致命问题</span>}
         <div className="spacer" />
         <span className="badge">{fileName || '未打开文件'}</span>
+        <Settings />
         <button onClick={() => inputRef.current?.click()}>打开 .flp</button>
         <input
           ref={inputRef}
@@ -190,23 +194,53 @@ export function App() {
         </div>
       ) : (
         <main>
-          <ChannelList channels={project.channels} selected={selectedChannel} onSelect={setSelectedChannel} />
-          <section className="content">
+          {/* FL layout: browser on the left, channel rack on the right,
+              working area in the middle. */}
+          <SplitPane
+            direction="horizontal"
+            anchor="start"
+            initial={240}
+            min={170}
+            max={420}
+            minOther={520}
+            storageKey="browser"
+          >
+            <Browser
+              project={project}
+              selectedPattern={selectedPattern}
+              onSelectPattern={(index) => {
+                setSelectedPattern(index);
+                setTab('style');
+              }}
+              onSelectChannel={setSelectedChannel}
+            />
+            <SplitPane
+              direction="horizontal"
+              anchor="end"
+              initial={260}
+              min={180}
+              max={460}
+              minOther={420}
+              storageKey="rack"
+            >
+              <ChannelList
+                channels={project.channels}
+                selected={selectedChannel}
+                onSelect={setSelectedChannel}
+              />
+              <section className="content">
             <div className="tabs">
-              <button className={tab === 'overview' ? 'active' : ''} onClick={() => setTab('overview')}>
-                信息
-              </button>
-              <button
-                className={tab === 'arrangement' ? 'active' : ''}
-                onClick={() => setTab('arrangement')}
-              >
+              <button className={tab === 'arrangement' ? 'active' : ''} onClick={() => setTab('arrangement')}>
                 编排
               </button>
-              <button className={tab === 'patterns' ? 'active' : ''} onClick={() => setTab('patterns')}>
-                Pattern
+              <button className={tab === 'style' ? 'active' : ''} onClick={() => setTab('style')}>
+                样式
               </button>
               <button className={tab === 'mixer' ? 'active' : ''} onClick={() => setTab('mixer')}>
                 混音台
+              </button>
+              <button className={tab === 'overview' ? 'active' : ''} onClick={() => setTab('overview')}>
+                信息
               </button>
               <button
                 className={tab === 'diagnostics' ? 'active' : ''}
@@ -239,29 +273,25 @@ export function App() {
             {tab === 'overview' && <Overview project={project} fileName={fileName} />}
 
             {tab === 'arrangement' && (
-              <div className="panel">
+              <div className="panel panel-flush">
                 <Arrangement
                   project={project}
                   arrangement={arrangement}
                   selectedPattern={selectedPattern}
-                  onSelectPattern={setSelectedPattern}
+                  onSelectPattern={(index) => {
+                    setSelectedPattern(index);
+                    setTab('style');
+                  }}
                 />
-                <div className="section-title">
-                  钢琴卷帘 ·{' '}
-                  {pattern ? pattern.name || `Pattern ${pattern.index + 1}` : '未选择 pattern'}
-                </div>
-                <PianoRoll pattern={pattern} ppq={project.meta.ppq} />
               </div>
             )}
 
-            {tab === 'patterns' && (
-              <PatternPicker
-                patterns={project.patterns}
-                selected={selectedPattern}
-                onSelect={(index) => {
-                  setSelectedPattern(index);
-                  setTab('arrangement');
-                }}
+            {tab === 'style' && (
+              <StyleView
+                project={project}
+                pattern={pattern}
+                ppq={project.meta.ppq}
+                onPickPattern={setSelectedPattern}
               />
             )}
 
@@ -291,6 +321,8 @@ export function App() {
               </div>
             )}
           </section>
+            </SplitPane>
+          </SplitPane>
         </main>
       )}
 
@@ -304,7 +336,7 @@ export function App() {
 
       <footer>
         只读 · 完全离线 · 不上传 · 非官方工具，与 Image-Line 无关联
-        {project && ` · 解析 ${project.channels.length} 通道 / ${project.patterns.length} pattern`}
+        {project && ` · 解析 ${project.channels.length} 通道 / ${project.patterns.length} 个样式`}
         {' · '}
         <span style={{ opacity: 0.7 }}>1-5 切换标签 · Ctrl+O 打开</span>
       </footer>

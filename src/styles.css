@@ -1,4 +1,5 @@
 :root {
+  --font-scale: 1;
   --bg: #14161a;
   --panel: #1b1f27;
   --panel-2: #212632;
@@ -28,7 +29,9 @@ body,
 body {
   background: var(--bg);
   color: var(--text);
-  font: 13px/1.5 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
+  font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
+  font-size: calc(13px * var(--font-scale));
+  line-height: 1.5;
   overflow: hidden;
 }
 
@@ -66,8 +69,7 @@ body {
 /* Keep wheel scrolling inside a panel instead of chaining to the page. */
 .panel,
 .channel-list,
-.arrangement,
-.pianoroll,
+.tl-scroll,
 pre.report {
   overscroll-behavior: contain;
 }
@@ -118,7 +120,7 @@ header {
   color: var(--muted);
   font-weight: 400;
   margin-left: 8px;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale));
 }
 
 .spacer {
@@ -126,7 +128,7 @@ header {
 }
 
 .badge {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   padding: 2px 8px;
   border-radius: 999px;
   border: 1px solid var(--line);
@@ -155,7 +157,7 @@ header {
 .drop strong {
   color: var(--text);
   display: block;
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale));
   margin-bottom: 8px;
 }
 
@@ -174,7 +176,7 @@ header {
   background: rgba(15, 17, 21, 0.82);
   border: 2px dashed var(--accent);
   color: var(--text);
-  font-size: 15px;
+  font-size: calc(15px * var(--font-scale));
   letter-spacing: 0.02em;
   pointer-events: none;
 }
@@ -185,7 +187,7 @@ header {
   background: rgba(224, 92, 92, 0.14);
   border-bottom: 1px solid rgba(224, 92, 92, 0.4);
   color: #f0a0a0;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale));
   cursor: pointer;
 }
 
@@ -193,22 +195,208 @@ main {
   flex: 1;
   display: flex;
   min-height: 0;
+  min-width: 0;
+}
+
+/* ---------- resizable panes ---------- */
+
+.split {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.split-horizontal {
+  flex-direction: row;
+}
+
+.split-vertical {
+  flex-direction: column;
+}
+
+.split-reverse {
+  flex-direction: row-reverse;
+}
+
+.split-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.split-rest {
+  flex: 1 1 auto;
+}
+
+.split-divider {
+  flex: 0 0 5px;
+  position: relative;
+  background: transparent;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background 120ms ease;
+}
+
+.split-vertical > .split-divider {
+  cursor: row-resize;
+}
+
+.split-divider:hover,
+.split-divider:focus-visible,
+.split-divider.active {
+  background: var(--accent);
+}
+
+.split-dragging {
+  user-select: none;
+}
+
+/* Keep the pointer honest while dragging, even outside the divider. */
+.split-horizontal.split-dragging,
+.split-horizontal.split-dragging * {
+  cursor: col-resize !important;
+}
+
+.split-vertical.split-dragging,
+.split-vertical.split-dragging * {
+  cursor: row-resize !important;
+}
+
+.pane-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.pane-head {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  font-size: calc(11px * var(--font-scale));
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.panel-flush {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 aside {
-  width: 260px;
-  flex: 0 0 auto;
-  border-right: 1px solid var(--line);
+  width: 100%;
+  flex: 1 1 auto;
   background: var(--panel);
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
+}
+
+/* ---------- browser (left: pattern / samples / envelopes) ---------- */
+
+.browser-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 6px 6px 0;
+  flex: 0 0 auto;
+}
+
+.browser-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 5px 2px 4px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: calc(9px * var(--font-scale));
+  letter-spacing: 0.02em;
+}
+
+.browser-tab:hover {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.browser-tab.active {
+  background: var(--panel-2);
+  border-color: var(--line);
+  color: var(--accent);
+}
+
+.browser-list {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 4px 0;
+}
+
+.browser-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px;
+  font-size: calc(12px * var(--font-scale));
+  cursor: pointer;
+  border-left: 2px solid transparent;
+}
+
+.browser-item:hover {
+  background: var(--panel-2);
+}
+
+.browser-item.selected {
+  background: var(--panel-2);
+  border-left-color: var(--accent);
+}
+
+.browser-item .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: 0 0 auto;
+}
+
+.browser-item .name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.browser-item .meta {
+  font-size: calc(10px * var(--font-scale));
+  color: var(--muted);
+}
+
+.browser-foot {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  border-top: 1px solid var(--line);
+  font-size: calc(10px * var(--font-scale));
+  color: var(--muted);
 }
 
 .aside-head {
   padding: 8px 12px;
   border-bottom: 1px solid var(--line);
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--muted);
@@ -227,7 +415,7 @@ input.filter {
   border-radius: var(--radius);
   color: var(--text);
   font: inherit;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale));
 }
 
 input.filter:focus {
@@ -268,7 +456,7 @@ input.filter:focus {
 }
 
 .channel .kind {
-  font-size: 10px;
+  font-size: calc(10px * var(--font-scale));
   color: var(--muted);
 }
 
@@ -311,38 +499,261 @@ input.filter:focus {
 }
 
 .card .label {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
 .card .value {
-  font-size: 15px;
+  font-size: calc(15px * var(--font-scale));
   margin-top: 2px;
   word-break: break-word;
 }
 
 .section-title {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale));
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   margin: 18px 0 8px;
 }
 
-.arrangement {
-  position: relative;
+/* ---------- timeline chrome (arrangement + piano roll) ---------- */
+
+.tl {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
   background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  overflow: auto;
-  max-height: 46vh;
+  overflow: hidden;
 }
 
-.arr-inner {
+/* Overview strip: narrow, shows the whole song. Wheel pans; the viewport box
+   inside it is the only thing that reacts to the pointer. */
+.tl-overview {
   position: relative;
+  flex: 0 0 26px;
+  background: #0f1217;
+  border-bottom: 1px solid var(--line);
+  overflow: hidden;
+  user-select: none;
+  cursor: default;
 }
+
+.tl-overview-content {
+  position: absolute;
+  inset: 0;
+}
+
+.ov-clip {
+  position: absolute;
+  border-radius: 1px;
+  opacity: 0.78;
+  min-height: 1px;
+}
+
+.ov-clip.pattern {
+  background: var(--pattern);
+}
+
+.ov-clip.audio {
+  background: var(--audio);
+}
+
+.ov-clip.automation {
+  background: var(--automation);
+}
+
+.ov-note {
+  position: absolute;
+  height: 2px;
+  background: var(--pattern);
+  opacity: 0.75;
+}
+
+.tl-overview-view {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 20%;
+  left: 0;
+  border: 1px solid var(--accent);
+  background: rgba(74, 158, 255, 0.14);
+  border-radius: 2px;
+}
+
+/* Middle drags the view; the two edges change how much is visible. */
+.ov-grab {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+}
+
+.ov-grab:active {
+  cursor: grabbing;
+}
+
+.ov-edge {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 9px;
+  cursor: ew-resize;
+  z-index: 2;
+}
+
+.ov-edge-left {
+  left: -5px;
+}
+
+.ov-edge-right {
+  right: -5px;
+}
+
+.ov-edge::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  left: 50%;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.ov-edge:hover::after {
+  opacity: 1;
+}
+
+/* Ruler: inside the scroller, pinned to the top. It therefore shares the
+   content's horizontal coordinate space and pans with it. */
+.tl-ruler {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  height: 22px;
+  min-width: 100%;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
+  /* Click cursor: the ruler is a target, not a drag handle. */
+  cursor: pointer;
+  user-select: none;
+}
+
+.tl-ruler-inner {
+  position: absolute;
+  inset: 0;
+}
+
+.tl-tick {
+  position: absolute;
+  top: 3px;
+  font-size: calc(9px * var(--font-scale));
+  color: var(--muted);
+  transform: translateX(3px);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.tl-tick.bar {
+  color: var(--text);
+}
+
+.tl-body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.tl-scroll {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+}
+
+/* Middle-button panning: the whole content area becomes a hand. */
+.tl-body.panning,
+.tl-body.panning * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+
+.tl-content {
+  position: relative;
+  min-height: 100%;
+}
+
+/* Row-height cell: a full-height block at the ruler's right end, separated by a
+   visible edge and carrying a three-line glyph that reads as "row height". */
+/* Row-height cell: pinned to the top-right of the viewport, above the scroller
+   and the sticky ruler. */
+.tl-vresize {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 28px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #2a3444;
+  border-left: 1px solid #55637d;
+  border-bottom: 1px solid var(--line);
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.06);
+  cursor: ns-resize;
+  outline: none;
+  z-index: 6;
+  transition: background 120ms ease;
+}
+
+.tl-vresize:hover,
+.tl-vresize:focus-visible {
+  background: #36435a;
+  border-left-color: var(--accent);
+}
+
+.tl-vresize.active {
+  background: rgba(74, 158, 255, 0.28);
+  border-left-color: var(--accent);
+}
+
+.tl-vresize span {
+  width: 14px;
+  height: 12px;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--text) 0,
+    var(--text) 2px,
+    transparent 2px,
+    transparent 5px
+  );
+  opacity: 0.55;
+}
+
+.tl-vresize:hover span,
+.tl-vresize.active span {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--accent) 0,
+    var(--accent) 2px,
+    transparent 2px,
+    transparent 5px
+  );
+  opacity: 1;
+}
+
+/* While dragging, keep the resize cursor everywhere. */
+.tl.height-dragging,
+.tl.height-dragging * {
+  cursor: ns-resize !important;
+}
+
+/* ---------- arrangement ---------- */
 
 .arr-row {
   position: absolute;
@@ -351,15 +762,36 @@ input.filter:focus {
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
+.arr-row:nth-child(even) {
+  background: rgba(255, 255, 255, 0.016);
+}
+
+.arr-track-name {
+  position: sticky;
+  left: 0;
+  display: inline-block;
+  width: 78px;
+  padding: 0 5px;
+  font-size: calc(9px * var(--font-scale));
+  color: var(--muted);
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  z-index: 3;
+  vertical-align: top;
+}
+
 .arr-clip {
   position: absolute;
-  height: 14px;
+  top: 2px;
   border-radius: 2px;
-  opacity: 0.85;
+  opacity: 0.86;
   overflow: hidden;
   white-space: nowrap;
-  font-size: 9px;
-  line-height: 14px;
+  font-size: calc(9px * var(--font-scale));
+  line-height: 1.5;
   padding: 0 3px;
   color: #06121f;
   cursor: pointer;
@@ -378,58 +810,46 @@ input.filter:focus {
 }
 
 .arr-clip.selected {
-  outline: 2px solid #fff;
+  outline: 1px solid #fff;
+  outline-offset: -1px;
   z-index: 2;
 }
 
-.track-label {
+/* ---------- piano roll ---------- */
+
+.pr-key-row {
   position: absolute;
   left: 0;
-  height: 16px;
-  line-height: 16px;
-  padding: 0 4px;
-  font-size: 9px;
-  color: var(--muted);
-  background: linear-gradient(90deg, var(--panel) 70%, transparent);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  z-index: 1;
-  pointer-events: none;
+  right: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
 }
 
-.ruler {
+.pr-key-row.c {
+  border-bottom-color: rgba(255, 255, 255, 0.13);
+}
+
+.pr-key-label {
   position: sticky;
-  top: 0;
-  height: 18px;
-  background: var(--panel-2);
-  border-bottom: 1px solid var(--line);
+  left: 0;
+  display: inline-block;
+  width: 34px;
+  padding-left: 4px;
+  font-size: calc(8px * var(--font-scale));
+  color: var(--muted);
+  background: var(--panel);
+  border-right: 1px solid var(--line);
   z-index: 3;
 }
 
-.ruler span {
+.pr-note {
   position: absolute;
-  top: 2px;
-  font-size: 9px;
-  color: var(--muted);
-  transform: translateX(2px);
+  background: var(--pattern);
+  border-radius: 1px;
+  opacity: 0.92;
 }
 
-.pianoroll {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  overflow: auto;
-  max-height: 42vh;
-}
-
-.note {
-  fill: var(--pattern);
-  opacity: 0.9;
-}
-
-.note.alt {
-  fill: var(--audio);
+.pr-note.alt {
+  background: var(--audio);
 }
 
 .issue {
@@ -456,7 +876,7 @@ input.filter:focus {
 
 .issue code {
   color: var(--muted);
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
 }
 
 pre.report {
@@ -466,7 +886,7 @@ pre.report {
   padding: 12px;
   overflow: auto;
   max-height: 40vh;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   color: var(--muted);
 }
 
@@ -496,13 +916,13 @@ pre.report {
   padding: 6px 8px;
   background: var(--panel-2);
   border-left: 3px solid var(--line);
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale));
   overflow: hidden;
 }
 
 .mixer-head .num {
   color: var(--muted);
-  font-size: 10px;
+  font-size: calc(10px * var(--font-scale));
   flex: 0 0 auto;
 }
 
@@ -526,7 +946,7 @@ pre.report {
   padding: 2px 4px;
   border-radius: 3px;
   background: rgba(255, 255, 255, 0.025);
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   overflow: hidden;
 }
 
@@ -537,7 +957,7 @@ pre.report {
 
 .mixer-slots .idx {
   color: var(--muted);
-  font-size: 9px;
+  font-size: calc(9px * var(--font-scale));
   min-width: 10px;
 }
 
@@ -550,7 +970,7 @@ pre.report {
 .mixer-slots .fx em {
   color: var(--muted);
   font-style: normal;
-  font-size: 10px;
+  font-size: calc(10px * var(--font-scale));
   margin-left: 6px;
 }
 
@@ -559,6 +979,435 @@ footer {
   padding: 6px 16px;
   border-top: 1px solid var(--line);
   color: var(--muted);
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale));
   background: var(--panel);
+}
+/* ---------- style view (piano roll + fixed inspector) ---------- */
+
+.style-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+.style-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+
+.style-title {
+  font-size: calc(12px * var(--font-scale));
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.style-channels {
+  display: flex;
+  gap: 4px;
+  flex-wrap: nowrap;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  font-size: calc(10px * var(--font-scale));
+  white-space: nowrap;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.chip:hover {
+  color: var(--text);
+  border-color: #3d4759;
+}
+
+.chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0b1220;
+  font-weight: 600;
+}
+
+.chip em {
+  font-style: normal;
+  opacity: 0.65;
+  font-size: calc(9px * var(--font-scale));
+}
+
+.style-view .strip-audio .ov-note {
+  background: var(--audio);
+}
+
+/* Inspector: fixed height, follows the pattern view. Not a resizable pane. */
+.style-inspector {
+  flex: 0 0 132px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border-top: 1px solid var(--line);
+}
+
+.insp-group {
+  background: var(--panel);
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.insp-label {
+  font-size: calc(10px * var(--font-scale));
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+
+.insp-value {
+  font-size: calc(14px * var(--font-scale));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insp-value.big {
+  font-size: calc(20px * var(--font-scale));
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.insp-sub {
+  font-size: calc(10px * var(--font-scale));
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.insp-num {
+  font-size: calc(11px * var(--font-scale));
+  color: var(--muted);
+  min-width: 34px;
+  text-align: right;
+}
+
+.meter {
+  position: relative;
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: #1a1f28;
+  overflow: hidden;
+}
+
+.meter-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--accent);
+  border-radius: 3px;
+}
+
+.meter-fill.audio {
+  background: var(--audio);
+}
+
+/* Selected note in the piano roll. */
+.pr-note.selected {
+  outline: 1px solid #fff;
+  outline-offset: -1px;
+  opacity: 1;
+}
+/* ---------- settings popover ---------- */
+
+.settings {
+  position: relative;
+  display: flex;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  color: var(--text);
+  border-color: #3d4759;
+}
+
+.icon-btn.active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.settings-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 230px;
+  padding: 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  z-index: 40;
+}
+
+.settings-title {
+  font-size: calc(10px * var(--font-scale));
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.settings-field {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: calc(12px * var(--font-scale));
+  margin-bottom: 6px;
+}
+
+.settings-field b {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.settings-range {
+  width: 100%;
+  accent-color: var(--accent);
+  margin: 2px 0 12px;
+}
+
+.settings-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.settings-actions button {
+  flex: 1;
+  padding: 4px 6px;
+  font-size: calc(11px * var(--font-scale));
+  border-radius: 5px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.settings-actions button:hover {
+  color: var(--text);
+  border-color: #3d4759;
+}
+
+/* ---------- control lane (FL's velocity / pan strip) ---------- */
+
+/* Outer box: pinned to the bottom of the viewport, outside the scroller. */
+.tl-lane {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-2);
+  border-top: 1px solid var(--line);
+  overflow: hidden;
+  z-index: 3;
+}
+
+.tl-lane-inner {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  will-change: transform;
+}
+
+.lane-bar {
+  position: absolute;
+  bottom: 3px;
+  width: 2px;
+  border-radius: 1px 1px 0 0;
+  background: var(--accent);
+  opacity: 0.9;
+}
+
+.lane-bar.alt {
+  background: var(--audio);
+}
+
+.lane-bar.current {
+  background: #fff;
+  width: 3px;
+  opacity: 1;
+}
+
+.lane-axis {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 56%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.07);
+  pointer-events: none;
+}
+
+.style-param {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: calc(10px * var(--font-scale));
+  color: var(--muted);
+}
+
+.style-param select {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 3px 6px;
+  font-size: calc(11px * var(--font-scale));
+  cursor: pointer;
+}
+
+.tl-lane-head {
+  flex: 0 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.tl-lane-track {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The lane must span the full width: reset the flex margin used elsewhere. */
+
+/* Lane header controls */
+.lane-label {
+  font-size: calc(10px * var(--font-scale));
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+
+.lane-select {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 2px 6px;
+  font-size: calc(11px * var(--font-scale));
+  cursor: pointer;
+}
+
+.lane-hint {
+  font-size: calc(10px * var(--font-scale));
+  color: var(--muted);
+  margin-left: auto;
+  padding-right: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Lane resize grip: the strip's top edge. */
+.tl-lane-grip {
+  flex: 0 0 5px;
+  cursor: ns-resize;
+  background: var(--panel-2);
+  border-top: 1px solid var(--line);
+  touch-action: none;
+}
+
+.tl-lane-grip:hover,
+.tl-lane.resizing .tl-lane-grip {
+  background: var(--accent);
+}
+
+.tl-lane.resizing,
+.tl-lane.resizing * {
+  cursor: ns-resize !important;
+  user-select: none;
+}
+
+/* Contain layout so a row-height change cannot invalidate the whole tree.
+   Without this, moving 3564 clips costs ~50 ms per frame on a large project. */
+.arr-row {
+  contain: layout style;
+}
+
+.pr-key-row {
+  contain: layout style;
+}
+
+/* The box itself owns the pointer; children are decoration for the cursor. */
+.tl-overview-view {
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+}
+
+/* Keep pointer-events ON: a `none` child cannot trigger a hover cursor, which
+   is what made the ↔ arrows disappear. Hit-testing is still done by the parent
+   from the pointer coordinates, so these are pure cursor affordances. */
+.tl-overview-view .ov-edge {
+  pointer-events: auto;
+  cursor: ew-resize;
+}
+
+.tl-overview-view .ov-grab {
+  pointer-events: auto;
+  cursor: grab;
+}
+
+
+
+
+
+/* Cursor while dragging the viewport box must match the gesture:
+   resizing shows ↔, panning shows the grabbed hand. Applying `grabbing` to
+   everything (the previous rule) made edge drags look like plain drags. */
+.tl-overview-view.drag-resize,
+.tl-overview-view.drag-resize * {
+  cursor: ew-resize !important;
+}
+
+.tl-overview-view.drag-pan,
+.tl-overview-view.drag-pan * {
+  cursor: grabbing !important;
 }

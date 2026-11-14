@@ -12,7 +12,7 @@
  * the two regions.
  */
 
-import { ByteReader, ascii, decodeText, u16At, u32At } from './stream.ts';
+import { ByteReader, ascii, decodeText, i32At, u16At, u32At } from './stream.ts';
 import {
   EVENT,
   EVENT_NAMES,
@@ -39,6 +39,10 @@ export type Channel = {
   vst: FlpVst | null;
   samplePath: string;
   color: string | null;
+  /** 0..1 from event 219; null when the file omits it (legacy projects). */
+  volume: number | null;
+  /** -1..1, 0 = centre; null when absent. */
+  pan: number | null;
 };
 
 export type Note = {
@@ -393,6 +397,8 @@ export function parseFlp(bytes: Uint8Array, profileOverride?: FlpProfile): Proje
           vst: null,
           samplePath: '',
           color: null,
+          volume: null,
+          pan: null,
         };
         channels.push(currentChannel);
         break;
@@ -434,6 +440,17 @@ export function parseFlp(bytes: Uint8Array, profileOverride?: FlpProfile): Proje
       case EVENT.SAMPLE_PATH:
         if (currentChannel) currentChannel.samplePath = decodeText(payload, textIsUtf16);
         break;
+      case EVENT.CHANNEL_LEVELS: {
+        // 24-byte payload: pan i32, volume u32, pitch i32, 12 opaque bytes.
+        // Fixed point over 12800, pan centred at 6400.
+        if (currentChannel && size >= 12) {
+          const LEVEL_MAX = 12800;
+          const PAN_CENTRE = 6400;
+          currentChannel.pan = (i32At(payload, 0) - PAN_CENTRE) / PAN_CENTRE;
+          currentChannel.volume = u32At(payload, 4) / LEVEL_MAX;
+        }
+        break;
+      }
       case EVENT.NEW_PATTERN: {
         const index = size === 2 ? u16At(payload, 0) : patterns.length;
         currentPattern = { index, name: '', color: null, notes: [] };

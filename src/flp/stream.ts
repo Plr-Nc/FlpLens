@@ -100,6 +100,11 @@ export function i8At(buf: Uint8Array, at: number): number {
   return v > 127 ? v - 256 : v;
 }
 
+export function i32At(buf: Uint8Array, at: number): number {
+  const v = u32At(buf, at);
+  return v > 0x7fffffff ? v - 0x100000000 : v;
+}
+
 /** ASCII payload with trailing NULs removed (used by the version event). */
 export function ascii(buf: Uint8Array, at = 0, len = buf.length): string {
   let out = '';

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Channel, Pattern, Project } from '../flp/project.ts';
+import type { Channel, Project } from '../flp/project.ts';
 import { channelKindName } from '../flp/events.ts';
 
 const KIND_COLOR: Record<number, string> = {
@@ -82,7 +82,7 @@ export function Overview(props: { project: Project; fileName: string }) {
     ['拍号', `${project.meta.timeSignature.numerator}/${project.meta.timeSignature.denominator}`],
     ['PPQ', String(project.meta.ppq)],
     ['通道', String(project.channels.length)],
-    ['Pattern', String(project.patterns.length)],
+    ['样式', String(project.patterns.length)],
     ['音符', String(notes)],
     ['编排片段', String(project.playlist.length)],
     ['编配', project.arrangements
@@ -155,33 +155,6 @@ export function Overview(props: { project: Project; fileName: string }) {
             ))}
         </div>
       )}
-    </div>
-  );
-}
-
-export function PatternPicker(props: {
-  patterns: Pattern[];
-  selected: number | null;
-  onSelect: (index: number) => void;
-}) {
-  const used = props.patterns.filter((pattern) => pattern.notes.length > 0);
-  return (
-    <div className="panel">
-      <div className="section-title">Pattern（{used.length} 个有音符）</div>
-      <div className="grid">
-        {used.map((pattern) => (
-          <button
-            key={pattern.index}
-            className={props.selected === pattern.index ? 'active' : ''}
-            style={{ textAlign: 'left' }}
-            onClick={() => props.onSelect(pattern.index)}
-          >
-            {pattern.name || `Pattern ${pattern.index + 1}`}
-            <span style={{ color: 'var(--muted)', float: 'right' }}>{pattern.notes.length} 音符</span>
-          </button>
-        ))}
-      </div>
-      {used.length === 0 && <div className="empty">这个工程没有 MIDI 音符</div>}
     </div>
   );
 }

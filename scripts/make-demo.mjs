@@ -120,6 +120,13 @@ const events = [
 
   ...CHANNELS.flatMap((channel, index) => {
     const out = [event(64, u16(index)), event(21, [channel.kind]), event(128, u32(channel.color))];
+    // Event 219: pan i32, volume u32, pitch i32, 12 opaque bytes. 12800 = full
+    // scale, pan centred at 6400 — the values FL itself writes.
+    const pan = 6400 + Math.round((index % 3 === 0 ? -0.35 : index % 3 === 1 ? 0.25 : 0) * 6400);
+    const volume = 12800 - (index % 4) * 900;
+    out.push(
+      event(219, [...u32(pan), ...u32(volume), ...u32(0), ...new Array(12).fill(0)]),
+    );
     if (channel.vst) {
       out.push(event(201, utf16('Fruity Wrapper')));
       out.push(event(203, utf16(channel.name)));
@@ -137,7 +144,16 @@ const events = [
     event(65, u16(index)),
     event(193, utf16(pattern.name)),
     event(150, u32(pattern.color)),
-    event(224, pattern.notes.flatMap(([position, key, length]) => note({ position, length, key, channel: 0 }))),
+    event(224, pattern.notes.flatMap(([position, key, length], step) =>
+      note({
+        position,
+        length,
+        key,
+        channel: (index + step) % 3,
+        velocity: 55 + ((step * 17 + index * 11) % 72),
+        pan: 64 + Math.round(Math.sin(step + index) * 40),
+      }),
+    )),
   ]),
 
   event(99, u16(0)),
