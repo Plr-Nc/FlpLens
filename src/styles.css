@@ -1333,6 +1333,18 @@ footer {
   overflow-x: auto;
 }
 
+/*
+ * The export button used to sit at the far left of this row — directly above the
+ * piano roll's key column, so it read as covering the note labels even though the
+ * two never overlapped vertically. Moving it to the right end keeps it away from
+ * that column entirely.
+ */
+/* The flex item is the wrapper, not the button inside it. */
+.style-head .export-midi {
+  order: 1;
+  margin-left: auto;
+}
+
 .style-title {
   font-size: calc(12px * var(--font-scale));
   font-weight: 600;
@@ -1772,10 +1784,10 @@ footer {
 .export-panel {
   animation: flp-pop var(--dur-base) var(--ease-out);
   will-change: transform, opacity;
-  /* Positioned from JS (portalled to body) so it is not clipped by the
-     scrollable style header. */
+  /* Positioned and sized from JS (portalled to body) so it is neither clipped
+     by the scrollable style header nor allowed to cover the key column. */
   position: fixed;
-  width: 320px;
+  max-width: 320px;
   max-height: 70vh;
   overflow: auto;
   padding: 12px;

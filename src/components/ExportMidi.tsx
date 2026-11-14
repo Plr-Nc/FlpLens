@@ -109,7 +109,7 @@ export function ExportMidi(props: {
   const [busy, setBusy] = useState(false);
   const triggerRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const [anchor, setAnchor] = useState({ left: 0, top: 0 });
+  const [anchor, setAnchor] = useState({ left: 0, top: 0, width: 320 });
 
   /*
    * The panel is portalled to <body>: its parent is the style header, which uses
@@ -122,17 +122,33 @@ export function ExportMidi(props: {
     const place = () => {
       const rect = triggerRef.current?.getBoundingClientRect();
       if (!rect) return;
-      const width = 320;
+
       /*
-       * Open to the *right* of the button, not under its left edge. The piano
-       * roll's key column is a 34 px sticky strip at the very left of the
-       * content area, directly below the button — a panel anchored at the
-       * button's left edge covered the top of it (the "ABC labels are hidden by
-       * MIDI" report). Starting at the button's right edge clears that column.
+       * Keep clear of the piano roll's key column.
+       *
+       * That column is a sticky strip at the very left of the content area,
+       * directly beneath the button. Anchoring the panel to the button's left
+       * edge covered it; anchoring to the right edge helped only on wide
+       * windows, because the right-hand clamp pushed it back over the column as
+       * soon as space ran out. So the column's actual right edge is measured and
+       * used as a hard floor, and the panel narrows rather than crossing it.
        */
-      const preferred = rect.right + 6;
-      const left = Math.min(Math.max(8, preferred), window.innerWidth - width - 8);
-      setAnchor({ left, top: Math.min(rect.bottom + 6, window.innerHeight - 200) });
+      const keyColumn = document.querySelector('.pr-timeline .pr-key-label');
+      const floor = keyColumn
+        ? Math.ceil(keyColumn.getBoundingClientRect().right) + 6
+        : 8;
+
+      const margin = 8;
+      const maxWidth = 320;
+      const available = window.innerWidth - floor - margin;
+      const width = Math.max(200, Math.min(maxWidth, available));
+      // The trigger now sits at the right end of the header, so the panel opens
+      // leftward from it — there is no room to the right. `floor` still keeps it
+      // off the key column on narrow windows.
+      const preferred = rect.right - width;
+      const left = Math.max(floor, Math.min(preferred, window.innerWidth - width - margin));
+
+      setAnchor({ left, width, top: Math.min(rect.bottom + 6, window.innerHeight - 200) });
     };
     place();
     window.addEventListener('resize', place);
@@ -278,7 +294,7 @@ export function ExportMidi(props: {
             role="dialog"
             aria-label="导出 MIDI"
             ref={panelRef}
-            style={{ position: 'fixed', left: anchor.left, top: anchor.top }}
+            style={{ position: 'fixed', left: anchor.left, top: anchor.top, width: anchor.width }}
           >
           <div className="export-head">
             <span>导出 MIDI</span>
