@@ -63,15 +63,26 @@ npm install
 npm run build
 ```
 
-然后双击 **`dist/flplens.html`**——单文件，250 KB，不需要服务器、不需要联网，拷到任何电脑都能开。
+产出 **`dist/flplens.html`**——单文件，约 300 KB，不需要服务器、不需要联网，拷到任何电脑都能开。
+
+### 两个构建命令的区别
+
+| 命令 | 产物 | 用途 |
+|---|---|---|
+| `npm run build` | `dist/flplens.html`（单文件，JS/CSS 全部内联） | **分发用**，双击即可 |
+| `npm run build:static` | `dist/index.html` + `dist/assets/*` | 部署到静态托管（GitHub Pages 等） |
+
+两个命令都会**先清空 `dist/`**，所以它们是互斥的：跑完 `build:static` 之后 `flplens.html` 就没了，反之亦然。
 
 ### 开发
 
 ```bash
-npm run dev        # http://localhost:5173
-npm run build:web  # 普通多文件构建（需要 HTTP 托管）
-npm test           # 单元测试（合成 fixture，不依赖任何音乐文件）
-npm run verify     # 批量回归：跑本机 .flp，断言通道数与 header 一致
+npm run dev            # http://localhost:5173
+npm run typecheck      # 只做类型检查
+npm test               # 单元测试（合成 fixture，不依赖任何音乐文件）
+npm run verify         # 批量回归：跑本机 .flp，断言通道数与 header 一致
+npm run demo           # 重新生成 docs/demo.flp（截图用的合成工程）
+npm run fixture        # 重新生成测试夹具
 ```
 
 `npm run verify` 默认扫描 `~/Documents/Image-Line`，可用 `FLP_DIR` 覆盖。

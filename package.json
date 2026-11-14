@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build && node scripts/inline.mjs",
-    "build:web": "tsc --noEmit && vite build",
+    "build:static": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "node --test test/parse.test.mjs",
     "verify": "node scripts/verify.mjs",
