@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Channel, Pattern, Project } from '../flp/project.ts';
 import { channelKindName } from '../flp/events.ts';
 
@@ -22,6 +22,12 @@ export function ChannelList(props: {
   onSelect: (index: number) => void;
 }) {
   const [query, setQuery] = useState('');
+  // A stale filter from the previous project looks like "no channels"; reset it
+  // whenever a different project is loaded.
+  useEffect(() => {
+    setQuery('');
+  }, [props.channels]);
+
   const needle = query.trim().toLowerCase();
   const filtered = needle
     ? props.channels.filter(

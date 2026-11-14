@@ -21,7 +21,14 @@ export function Arrangement(props: {
   const ppq = project.meta.ppq || 96;
   const { numerator, denominator } = project.meta.timeSignature;
   const beatsPerBar = numerator * (4 / denominator);
-  const maxTick = items.reduce((max, item) => Math.max(max, item.position + item.length), 0);
+
+  let rawMax = 0;
+  for (const item of items) {
+    const end = item.position + item.length;
+    if (end > rawMax) rawMax = end;
+  }
+  // Corrupt lengths must not turn into a 200-million-pixel-wide canvas.
+  const maxTick = Math.min(rawMax, ppq * 4 * 4096);
   const totalBeats = Math.ceil(maxTick / ppq) + 1;
   const bars = Math.ceil(totalBeats / beatsPerBar);
   const width = TRACK_HEAD + totalBeats * PX_PER_BEAT;
@@ -72,13 +79,19 @@ export function Arrangement(props: {
                 `Pattern ${item.pattern + 1}`
               : project.channels.find((c) => c.index === item.channel)?.name ?? '';
           const selected = item.pattern !== null && item.pattern === props.selectedPattern;
+          // Keep every clip inside the (already clamped) timeline.
+          const left = Math.min(
+            TRACK_HEAD + (item.position / ppq) * PX_PER_BEAT,
+            Math.max(TRACK_HEAD, width - 3),
+          );
+          const clipWidth = Math.max(3, Math.min((item.length / ppq) * PX_PER_BEAT, width - left));
           return (
             <div
               key={index}
               className={`arr-clip ${kind}` + (selected ? ' selected' : '')}
               style={{
-                left: TRACK_HEAD + (item.position / ppq) * PX_PER_BEAT,
-                width: Math.max(3, (item.length / ppq) * PX_PER_BEAT),
+                left,
+                width: clipWidth,
                 top: RULER_HEIGHT + rowIndex.get(item.track)! * ROW_HEIGHT + 2,
               }}
               title={`${label} · 轨道 ${item.track}${

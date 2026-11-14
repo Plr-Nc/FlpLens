@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { parseFlp } from './flp/project.ts';
 import type { Project } from './flp/project.ts';
-import { buildReport } from './flp/diagnostics.ts';
+import { buildReport, hasFatal } from './flp/diagnostics.ts';
 import { ChannelList, Overview, PatternPicker } from './views/Panels.tsx';
 import { Arrangement } from './views/Arrangement.tsx';
 import { PianoRoll } from './views/PianoRoll.tsx';
@@ -19,12 +19,32 @@ export function App() {
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  // Reading a 46 MB file is async; if two drops land close together the slower
+  // one must not overwrite the newer one.
+  const loadSeq = useRef(0);
 
   const load = useCallback(async (file: File) => {
     setError('');
+    if (file.size === 0) {
+      setError('这是一个空文件或文件夹。');
+      return;
+    }
+    if (!/\.(flp|fst|fsc)$/i.test(file.name)) {
+      setError(`不认识的扩展名：${file.name}（需要 .flp）`);
+      return;
+    }
+    const seq = ++loadSeq.current;
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
+      if (seq !== loadSeq.current) return; // a newer file already won
       const parsed = parseFlp(bytes);
+      // A file we cannot parse must never replace a project that is already
+      // open — otherwise a mis-drop throws away what the user was looking at.
+      if (hasFatal(parsed.diagnostics)) {
+        const first = parsed.diagnostics.issues.find((issue) => issue.severity === 'fatal');
+        setError(`${file.name} 打不开：${first?.message ?? '不是有效的 FL Studio 工程'}`);
+        return;
+      }
       setProject(parsed);
       setFileName(file.name);
       setArrangement(parsed.arrangements[0] ?? 0);
@@ -62,6 +82,49 @@ export function App() {
     () => project?.patterns.find((item) => item.index === selectedPattern) ?? null,
     [project, selectedPattern],
   );
+
+  useEffect(() => {
+    // Dropping a file anywhere must open it, never let the browser navigate to
+    // it or download it. This has to live on window: once a project is open the
+    // empty-state drop zone no longer exists.
+    const hasFiles = (event: DragEvent) =>
+      Array.from(event.dataTransfer?.types ?? []).includes('Files');
+
+    const onDragOver = (event: DragEvent) => {
+      if (!hasFiles(event)) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+      setDragging(true);
+    };
+
+    const onDragLeave = (event: DragEvent) => {
+      // relatedTarget is null only when the pointer leaves the window itself.
+      if (event.relatedTarget === null) setDragging(false);
+    };
+
+    // Belt and braces: if the drag is cancelled outside the window no
+    // dragleave fires and the overlay would stay up.
+    const onDragEnd = () => setDragging(false);
+
+    const onDrop = (event: DragEvent) => {
+      if (!hasFiles(event)) return;
+      event.preventDefault();
+      setDragging(false);
+      const file = Array.from(event.dataTransfer?.files ?? [])[0];
+      if (file) void load(file);
+    };
+
+    window.addEventListener('dragover', onDragOver);
+    window.addEventListener('dragleave', onDragLeave);
+    window.addEventListener('drop', onDrop);
+    window.addEventListener('dragend', onDragEnd);
+    return () => {
+      window.removeEventListener('dragover', onDragOver);
+      window.removeEventListener('dragleave', onDragLeave);
+      window.removeEventListener('drop', onDrop);
+      window.removeEventListener('dragend', onDragEnd);
+    };
+  }, [load]);
 
   const issues = project?.diagnostics.issues ?? [];
   const fatal = issues.filter((issue) => issue.severity === 'fatal').length;
@@ -118,20 +181,7 @@ export function App() {
       </header>
 
       {!project ? (
-        <div
-          className={'drop' + (dragging ? ' over' : '')}
-          onDragOver={(event) => {
-            event.preventDefault();
-            setDragging(true);
-          }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={(event) => {
-            event.preventDefault();
-            setDragging(false);
-            const file = event.dataTransfer.files?.[0];
-            if (file) void load(file);
-          }}
-        >
+        <div className={'drop' + (dragging ? ' over' : '')}>
           <div>
             <strong>把 .flp 拖进来</strong>
             文件只在本地解析，不会上传。支持 FL Studio 2025（其他版本降级为只读元数据）。
@@ -243,6 +293,14 @@ export function App() {
           </section>
         </main>
       )}
+
+      {error && project && (
+        <div className="error-bar" onClick={() => setError('')}>
+          {error}（点击关闭）
+        </div>
+      )}
+
+      {dragging && <div className="drop-overlay">松开以打开工程</div>}
 
       <footer>
         只读 · 完全离线 · 不上传 · 非官方工具，与 Image-Line 无关联

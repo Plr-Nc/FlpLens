@@ -32,6 +32,46 @@ body {
   overflow: hidden;
 }
 
+/* Slim, theme-matched scrollbars — the Windows default is far too heavy here. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #333c4c transparent;
+}
+
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2f3746;
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #465268;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Keep wheel scrolling inside a panel instead of chaining to the page. */
+.panel,
+.channel-list,
+.arrangement,
+.pianoroll,
+pre.report {
+  overscroll-behavior: contain;
+}
+
 button {
   font: inherit;
   color: var(--text);
@@ -122,6 +162,31 @@ header {
 .drop.over {
   outline: 2px dashed var(--accent);
   outline-offset: -16px;
+}
+
+/* Shown while a file is hovering anywhere over the window. */
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 17, 21, 0.82);
+  border: 2px dashed var(--accent);
+  color: var(--text);
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+
+.error-bar {
+  flex: 0 0 auto;
+  padding: 6px 16px;
+  background: rgba(224, 92, 92, 0.14);
+  border-bottom: 1px solid rgba(224, 92, 92, 0.4);
+  color: #f0a0a0;
+  font-size: 12px;
+  cursor: pointer;
 }
 
 main {

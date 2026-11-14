@@ -12,13 +12,25 @@ export function PianoRoll(props: { pattern: Pattern | null; ppq: number }) {
   }
 
   const ppq = props.ppq || 96;
-  const maxTick = pattern.notes.reduce((max, note) => Math.max(max, note.position + note.length), 0);
-  const beats = Math.ceil(maxTick / ppq) + 1;
+
+  // A loop, not Math.min(...keys): spread blows the call stack past ~100k notes.
+  let maxTick = 0;
+  let lowest = 127;
+  let highest = 0;
+  for (const note of pattern.notes) {
+    const end = note.position + note.length;
+    if (end > maxTick) maxTick = end;
+    if (note.key < lowest) lowest = note.key;
+    if (note.key > highest) highest = note.key;
+  }
+
+  // Clamp against corrupt values: an absurd length must not ask the browser to
+  // lay out a billion-pixel SVG.
+  const beats = Math.min(Math.ceil(maxTick / ppq) + 1, 8192);
   const width = beats * PX_PER_BEAT;
 
-  const keys = pattern.notes.map((note) => note.key);
-  const minKey = Math.max(LOW_KEY, Math.min(...keys) - 2);
-  const maxKey = Math.min(HIGH_KEY, Math.max(...keys) + 2);
+  const minKey = Math.max(LOW_KEY, lowest - 2);
+  const maxKey = Math.min(HIGH_KEY, highest + 2);
   const rows = maxKey - minKey + 1;
   const height = rows * KEY_HEIGHT;
 
