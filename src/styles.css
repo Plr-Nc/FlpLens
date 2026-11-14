@@ -1170,6 +1170,7 @@ input.filter:focus {
 
 .pr-note {
   position: absolute;
+  z-index: 1;
   background: var(--pattern);
   border-radius: 1px;
   opacity: 0.92;
@@ -1715,8 +1716,18 @@ footer {
   contain: layout style;
 }
 
+/*
+ * The key rows must outrank the note layer as a whole.
+ *
+ * z-index only competes inside one stacking context: the notes carry z-index 1,
+ * while these rows default to auto (0), so every row — and the sticky label
+ * inside it — was painted underneath the notes no matter what z-index the label
+ * itself declared. Raising the row establishes the order once, for the whole
+ * column.
+ */
 .pr-key-row {
-  contain: layout style;
+  contain: style;
+  z-index: 4;
 }
 
 /* The box itself owns the pointer; children are decoration for the cursor. */
