@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { Note, Pattern, Project } from '../flp/project.ts';
 import { TimelineView } from '../components/TimelineView.tsx';
+import { ExportMidi } from '../components/ExportMidi.tsx';
 
 const LOW_KEY = 21;
 const HIGH_KEY = 108;
@@ -31,7 +32,7 @@ export function StyleView(props: {
   onPickPattern: (index: number) => void;
 }) {
   const { pattern, project } = props;
-  const [rowHeight, setRowHeight] = useState(9);
+  const [rowHeight, setRowHeight] = useState(12);
   const [channelFilter, setChannelFilter] = useState<number | 'all'>('all');
   const [param, setParam] = useState<ControlParam>('velocity');
   const [laneHeight, setLaneHeight] = useState(LANE_DEFAULT);
@@ -80,6 +81,7 @@ export function StyleView(props: {
   return (
     <div className="style-view">
       <div className="style-head">
+        <ExportMidi project={project} pattern={pattern} ppq={ppq} />
         <span className="style-title">{pattern.name || `样式 ${pattern.index + 1}`}</span>
         <div className="style-channels">
           <button
@@ -241,17 +243,26 @@ export function StyleView(props: {
                 const index = firstIndex + offset;
                 const key = high - index;
                 const isC = key % 12 === 0;
+                const isBlack = [1, 3, 6, 8, 10].includes(((key % 12) + 12) % 12);
                 return (
                   <div
                     key={key}
-                    className={'pr-key-row' + (isC ? ' c' : '')}
+                    className={
+                      'pr-key-row' + (isC ? ' c' : '') + (isBlack ? ' black' : '')
+                    }
                     style={{ top: `calc(var(--row-h) * ${index})`, height: 'var(--row-h)' }}
                   >
-                    {isC && (
-                      <span className="pr-key-label" style={{ lineHeight: 'var(--row-h)' }}>
-                        {noteName(key)}
-                      </span>
-                    )}
+                    {/* Every key is labelled; the size follows the row height so
+                        it stays legible whether rows are 4px or 26px tall. */}
+                    <span
+                      className={'pr-key-label' + (isC ? ' c' : '') + (isBlack ? ' black' : '')}
+                      style={{
+                        lineHeight: 'var(--row-h)',
+                        fontSize: 'clamp(5px, calc(var(--row-h) - 2px), 11px)',
+                      }}
+                    >
+                      {noteName(key)}
+                    </span>
                   </div>
                 );
               })}
@@ -266,6 +277,10 @@ export function StyleView(props: {
                   return null;
                 }
                 const selected = selectedNote?.index === index;
+                const noteWidth = Math.max(2, note.length * pxPerTick);
+                // Name the pitch inside the note when there is room for it; a
+                // 3px sliver just stays a colour block.
+                const showLabel = noteWidth >= 24 && rowHeight >= 8;
                 return (
                   <div
                     key={index}
@@ -277,14 +292,23 @@ export function StyleView(props: {
                     style={{
                       left: KEY_HEAD + note.position * pxPerTick,
                       top: `calc(var(--row-h) * ${high - note.key})`,
-                      width: Math.max(2, note.length * pxPerTick),
+                      width: noteWidth,
                       height: 'calc(var(--row-h) - 1px)',
                       // Velocity drives lightness, the way FL shades notes.
                       filter: `brightness(${(0.5 + (note.velocity / 127) * 0.75).toFixed(2)})`,
                     }}
                     title={`${noteName(note.key)} · 力度 ${note.velocity} · 声像 ${note.pan}`}
                     onClick={() => setSelectedNote({ note, index })}
-                  />
+                  >
+                    {showLabel && (
+                      <span
+                        className="pr-note-label"
+                        style={{ fontSize: 'clamp(5px, calc(var(--row-h) - 3px), 10px)' }}
+                      >
+                        {noteName(note.key)}
+                      </span>
+                    )}
+                  </div>
                 );
               })}
             </div>

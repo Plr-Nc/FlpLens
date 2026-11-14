@@ -24,6 +24,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import type { ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { useRafCallback } from './useRafCallback.ts';
+import { useScrollColumn } from './useScrollColumn.ts';
+import { useDrag } from './useDrag.ts';
 
 export type Viewport = {
   /** Scroll offset and size, in content pixels. */
@@ -105,29 +107,16 @@ export function TimelineView(props: TimelineViewProps) {
 
   const overviewRef = useRef<HTMLDivElement>(null);
   const rulerRef = useRef<HTMLDivElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const column = useScrollColumn();
+  const scrollRef = column.elementRef;
   const viewportRef = useRef<HTMLDivElement>(null);
   const laneRef = useRef<HTMLDivElement>(null);
-  const heightDragRef = useRef<{ y: number; height: number; pointer: number } | null>(null);
-  const laneDragRef = useRef<{ y: number; height: number; pointer: number } | null>(null);
+  const heightHandleRef = useRef<HTMLDivElement>(null);
   const [draggingLane, setDraggingLane] = useState(false);
-  const overviewDragRef = useRef<OverviewDrag | null>(null);
   /** Middle-button grab-scroll, like FL's hand tool. */
-  const panRef = useRef<{ x: number; y: number; left: number; top: number; pointer: number } | null>(
-    null,
-  );
   const pendingScrollRef = useRef<number | null>(null);
-  /**
-   * Sub-pixel scroll position. `scrollLeft` reads back as an integer, so using
-   * it as the anchor for the next zoom folds a rounding error into every step.
-   */
-  const theoScrollRef = useRef(0);
-  /**
-   * Where we last put `scrollLeft` ourselves. Used to tell our own writes apart
-   * from real scrolling: after a zoom we want to keep the sub-pixel value, after
-   * a pan we must adopt the DOM value.
-   */
-  const lastWriteRef = useRef<number | null>(null);
+
+
   /**
    * The authoritative zoom value.
    *
@@ -143,7 +132,17 @@ export function TimelineView(props: TimelineViewProps) {
 
   const pxPerTick = pxPerBeat / ppq;
   const leading = props.leadingInset ?? 0;
-  const contentWidth = Math.max(1, leading + props.totalTicks * pxPerTick);
+  /**
+   * Blank run-out after the last bar.
+   *
+   * Without it the final clip sits flush against the right edge and there is no
+   * way to scroll past the end of the song, so the tail of the last clip can
+   * never be viewed comfortably. It is part of the content width, which means
+   * the scrollbar, the overview proportions and the zoom clamps all account for
+   * it automatically.
+   */
+  const TAIL_SPACE = 160;
+  const contentWidth = Math.max(1, leading + props.totalTicks * pxPerTick + TAIL_SPACE);
 
   /**
    * Tick <-> pixel conversions must go through `leading`.
@@ -182,14 +181,7 @@ export function TimelineView(props: TimelineViewProps) {
   const onScrollSync = useCallback(() => {
     const scroll = scrollRef.current;
     if (scroll) {
-      // Adopt the DOM value unless this scroll is the echo of a write we just
-      // made. Keeping our own value preserves sub-pixel precision across a zoom
-      // burst; adopting on a real pan keeps the two in step.
-      const ours = lastWriteRef.current;
-      if (ours === null || Math.abs(scroll.scrollLeft - ours) > 2) {
-        theoScrollRef.current = scroll.scrollLeft;
-        lastWriteRef.current = null;
-      }
+      column.adopt();
       // Publish the visible rectangle for virtualised content. Compared before
       // setting so a scroll that does not actually change the window does not
       // trigger a render.
@@ -210,7 +202,7 @@ export function TimelineView(props: TimelineViewProps) {
     }
     syncViewportBox();
     syncLane();
-  }, [syncViewportBox, syncLane]);
+  }, [syncViewportBox, syncLane, column]);
 
   /**
    * The ONLY place `scrollLeft` is written.
@@ -228,20 +220,11 @@ export function TimelineView(props: TimelineViewProps) {
    */
   const applyScroll = useCallback(
     (target: number, subpixel = true) => {
-      const scroll = scrollRef.current;
-      if (!scroll) return;
-      const max = Math.max(0, scroll.scrollWidth - scroll.clientWidth);
-      const clamped = Math.min(Math.max(target, 0), max);
-      if (Math.abs(scroll.scrollLeft - clamped) > 0.5) {
-        scroll.scrollLeft = clamped;
-      }
-      const authoritative = subpixel ? clamped : scroll.scrollLeft;
-      theoScrollRef.current = authoritative;
-      lastWriteRef.current = authoritative;
+      column.write(target, subpixel);
       syncViewportBox();
       syncLane();
     },
-    [syncViewportBox, syncLane],
+    [column, syncViewportBox, syncLane],
   );
 
   /**
@@ -288,18 +271,25 @@ export function TimelineView(props: TimelineViewProps) {
    * One synchronous commit is exact and stable, and ~9 % per notch already
    * reads as smooth.
    */
+  /**
+   * Apply a zoom step to an already-clamped target scroll position.
+   *
+   * This used to take the anchor tick instead, and `zoomAt` refused the whole
+   * step whenever honouring that anchor needed an out-of-range `scrollLeft`.
+   * That guard cured a jump but introduced a worse defect: with the cursor near
+   * either end of the song, zooming stopped working at all. The caller now
+   * clamps the target, so the step always happens — the anchor drifts slightly
+   * at the edges, which is unavoidable and far less surprising than a dead
+   * wheel.
+   */
   const stepZoom = useCallback(
-    (next: number, anchorTick: number, offset: number) => {
-      const target = leading + anchorTick * (next / ppq) - offset;
-      const clamped = Math.max(0, target);
+    (next: number, targetScroll: number) => {
       pxPerBeatRef.current = next;
-      theoScrollRef.current = clamped;
-      lastWriteRef.current = clamped;
       // Commit scale and offset together so no frame is painted between them.
       flushSync(() => setPxPerBeat(next));
-      applyScroll(clamped, true);
+      applyScroll(targetScroll, true);
     },
-    [ppq, leading, syncViewportBox, syncLane],
+    [applyScroll],
   );
 
   /** Set zoom + left edge directly (used by edge-dragging the viewport box). */
@@ -329,8 +319,7 @@ export function TimelineView(props: TimelineViewProps) {
         return;
       }
       pxPerBeatRef.current = nextPxPerBeat;
-      theoScrollRef.current = targetScroll;
-      lastWriteRef.current = targetScroll;
+
       setPxPerBeat(nextPxPerBeat);
       pendingScrollRef.current = targetScroll;
     },
@@ -350,22 +339,19 @@ export function TimelineView(props: TimelineViewProps) {
       const rect = scroll.getBoundingClientRect();
       const offset = clientX - rect.left;
       const pxPerTickNow = current / ppq;
-      const tickUnderCursor = (theoScrollRef.current + offset - leading) / pxPerTickNow;
+      const tickUnderCursor = (column.read() + offset - leading) / pxPerTickNow;
       const target = leading + tickUnderCursor * (next / ppq) - offset;
 
       /*
-       * Near the ends of the song the anchor may be unreachable: keeping the
-       * cursor's tick in place would need a scrollLeft outside [0, max]. Baking
-       * that in is exactly the "the view suddenly jumps" report, so refuse the
-       * step instead. A few pixels of clamping is imperceptible and still
-       * allowed.
+       * Clamp rather than bail out. Refusing the step made the wheel dead at
+       * both ends of the song, which reads as "zooming is broken here" — much
+       * worse than the few pixels of anchor drift clamping costs.
        */
-      const nextContentWidth = leading + props.totalTicks * (next / ppq);
+      const nextContentWidth = leading + props.totalTicks * (next / ppq) + TAIL_SPACE;
       const nextMaxScroll = Math.max(0, nextContentWidth - scroll.clientWidth);
-      const reachable = Math.min(Math.max(target, 0), nextMaxScroll);
-      if (Math.abs(reachable - target) > 4) return;
+      const bounded = Math.min(Math.max(target, 0), nextMaxScroll);
 
-      stepZoom(next, tickUnderCursor, offset);
+      stepZoom(next, bounded);
     },
     [ppq, leading, cancelSmoothPan, fillPxPerBeat, stepZoom, props.minPxPerBeat, props.maxPxPerBeat],
   );
@@ -466,6 +452,22 @@ export function TimelineView(props: TimelineViewProps) {
     [],
   );
 
+  /**
+   * The row-height handle sits on top of the ruler's right end. Without this,
+   * a wheel over the last ~28px of the ruler hit the handle instead and did
+   * nothing — which reads as "zooming is broken at the right edge".
+   */
+  useEffect(() => {
+    const el = heightHandleRef.current;
+    if (!el) return;
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      zoomByWheel(event.clientX, event.deltaY);
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [zoomByWheel]);
+
   // Wheel over the ruler zooms around the cursor.
   useEffect(() => {
     const el = rulerRef.current;
@@ -481,165 +483,115 @@ export function TimelineView(props: TimelineViewProps) {
   // ---- viewport box dragging -------------------------------------------------
 
   /**
-   * Decide pan-vs-resize from where the pointer landed on the box.
+   * The viewport box: drag the middle to pan, either edge to resize.
    *
-   * This used to be three absolutely-positioned child handles (left edge, grab,
-   * right edge). When the box gets narrow — which is exactly when you zoom in —
-   * the two 9 px edges cover it entirely and the middle grab collapses to zero
-   * width, so the box "sometimes won't drag". Measuring the hit position against
-   * the box itself works at any width, and a box too narrow for edges is simply
-   * pan-only.
+   * Edge zones scale with the box width (a fixed 10px made the box impossible to
+   * resize once zoomed narrow), and the hit test is done here against the box
+   * rect rather than relying on child elements — children cannot be hit at all
+   * when the box is a few pixels wide.
    */
-  const beginOverviewDrag = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
-    const scroll = scrollRef.current;
-    const box = viewportRef.current;
-    if (!scroll || !box) return;
-    const rect = box.getBoundingClientRect();
-    const localX = event.clientX - rect.left;
-    const EDGE = 10;
-    let mode: OverviewDrag['mode'] = 'pan';
-    if (rect.width > EDGE * 3) {
-      if (localX < EDGE) mode = 'left';
-      else if (localX > rect.width - EDGE) mode = 'right';
-    }
-    event.preventDefault();
-    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-    const currentPxPerTick = pxPerBeatRef.current / ppq;
-    overviewDragRef.current = {
-      mode,
-      pointer: event.pointerId,
-      startX: event.clientX,
-      startLeftTick: (scroll.scrollLeft - leading) / currentPxPerTick,
-      startVisibleTicks: scroll.clientWidth / currentPxPerTick,
-    };
-    setDraggingView(true);
-    setOverviewMode(mode);
-  };
+  const overviewDrag = useDrag<{
+    mode: OverviewDrag['mode'];
+    startX: number;
+    startLeftTick: number;
+    startVisibleTicks: number;
+  }>(
+    (event) => {
+      const scroll = scrollRef.current;
+      const box = viewportRef.current;
+      if (!scroll || !box) return null;
+      const rect = box.getBoundingClientRect();
+      const localX = event.clientX - rect.left;
+      const edge = Math.max(2, Math.min(10, rect.width / 3));
+      const mode: OverviewDrag['mode'] =
+        localX < edge ? 'left' : localX > rect.width - edge ? 'right' : 'pan';
+      event.preventDefault();
+      const pxPerTickNow = pxPerBeatRef.current / ppq;
+      setDraggingView(true);
+      setOverviewMode(mode);
+      return {
+        mode,
+        startX: event.clientX,
+        startLeftTick: (column.read() - leading) / pxPerTickNow,
+        startVisibleTicks: scroll.clientWidth / pxPerTickNow,
+      };
+    },
+    (context, event) => {
+      const scroll = scrollRef.current;
+      const overview = overviewRef.current;
+      if (!scroll || !overview) return;
+      const width = overview.clientWidth;
+      if (width <= 0) return;
+      const ratio = (event.clientX - context.startX) / width;
+      const totalTicks = Math.max(1, props.totalTicks);
 
-  const onOverviewDragMove = (event: React.PointerEvent) => {
-    const drag = overviewDragRef.current;
-    const scroll = scrollRef.current;
-    const overview = overviewRef.current;
-    if (!drag || !scroll || !overview || drag.pointer !== event.pointerId) return;
-    const width = overview.clientWidth;
-    if (width <= 0) return;
-    const ratio = (event.clientX - drag.startX) / width;
-    const totalTicks = Math.max(1, props.totalTicks);
+      if (context.mode === 'pan') {
+        const pxPerTickNow = pxPerBeatRef.current / ppq;
+        const targetLeft = context.startLeftTick + ratio * totalTicks;
+        applyScroll(leading + targetLeft * pxPerTickNow, false);
+        return;
+      }
 
-    if (drag.mode === 'pan') {
-      const currentPxPerTick = pxPerBeatRef.current / ppq;
-      const targetLeft = drag.startLeftTick + ratio * totalTicks;
-      applyScroll(leading + targetLeft * currentPxPerTick, false);
-      return;
-    }
-
-    if (drag.mode === 'right') {
-      applyView(drag.startLeftTick, drag.startVisibleTicks + ratio * totalTicks);
-    } else {
-      const newLeft = drag.startLeftTick + ratio * totalTicks;
-      const rightTick = drag.startLeftTick + drag.startVisibleTicks;
-      applyView(newLeft, Math.max(MIN_VISIBLE_TICKS, rightTick - newLeft));
-    }
-  };
-
-  const endOverviewDrag = (event: React.PointerEvent) => {
-    const drag = overviewDragRef.current;
-    if (!drag || drag.pointer !== event.pointerId) return;
-    overviewDragRef.current = null;
-    setDraggingView(false);
-    setOverviewMode(null);
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    onScrollSync();
-  };
-
+      if (context.mode === 'right') {
+        applyView(context.startLeftTick, context.startVisibleTicks + ratio * totalTicks);
+      } else {
+        const newLeft = context.startLeftTick + ratio * totalTicks;
+        const rightTick = context.startLeftTick + context.startVisibleTicks;
+        applyView(newLeft, Math.max(MIN_VISIBLE_TICKS, rightTick - newLeft));
+      }
+    },
+    () => {
+      setDraggingView(false);
+      setOverviewMode(null);
+      onScrollSync();
+    },
+  );
   // ---- middle-button panning -------------------------------------------------
 
   /**
-   * Returns true when the event was consumed, so callers can stop propagation.
-   * `button === 1` is the middle button; the mousedown preventDefault stops
-   * Chromium's auto-scroll widget from hijacking the gesture.
+   * Grab-style pan with the middle button. The mousedown handler that stops
+   * Chromium's auto-scroll widget lives on the element, not here.
    */
-  const beginPan = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 1) return;
-    const el = event.currentTarget;
-    event.preventDefault();
-    el.setPointerCapture(event.pointerId);
-    panRef.current = {
-      x: event.clientX,
-      y: event.clientY,
-      left: el.scrollLeft,
-      top: el.scrollTop,
-      pointer: event.pointerId,
-    };
-    setPanning(true);
-  };
-
-  const movePan = (event: React.PointerEvent<HTMLDivElement>) => {
-    const drag = panRef.current;
-    if (!drag || drag.pointer !== event.pointerId) return;
-    const el = event.currentTarget;
-    // Grab-style: the content follows the pointer.
-    applyScroll(drag.left - (event.clientX - drag.x), false);
-    el.scrollTop = drag.top - (event.clientY - drag.y);
-  };
-
-  const endPan = (event: React.PointerEvent<HTMLDivElement>) => {
-    const drag = panRef.current;
-    if (!drag || drag.pointer !== event.pointerId) return;
-    panRef.current = null;
-    setPanning(false);
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-  };
+  const panDrag = useDrag<{ x: number; y: number; left: number; top: number }>(
+    (event) => {
+      const el = scrollRef.current;
+      if (!el) return null;
+      event.preventDefault();
+      setPanning(true);
+      return { x: event.clientX, y: event.clientY, left: column.read(), top: el.scrollTop };
+    },
+    (context, event) => {
+      const el = scrollRef.current;
+      if (!el) return;
+      // The content follows the pointer.
+      applyScroll(context.left - (event.clientX - context.x), false);
+      el.scrollTop = context.top - (event.clientY - context.y);
+    },
+    () => setPanning(false),
+    [1],
+  );
 
   // ---- lane height ----------------------------------------------------------
 
   const laneMin = props.minLaneHeight ?? 56;
   const laneMax = props.maxLaneHeight ?? 260;
 
-  const onLaneGripDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || !props.onLaneHeightChange) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    laneDragRef.current = {
-      y: event.clientY,
-      height: props.laneHeight ?? 0,
-      pointer: event.pointerId,
-    };
-    setDraggingLane(true);
-  };
-
   const applyLaneHeight = useRafCallback<number>((value) => props.onLaneHeightChange?.(value));
 
-  const onLaneGripMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    const drag = laneDragRef.current;
-    if (!drag || drag.pointer !== event.pointerId || !props.onLaneHeightChange) return;
-    // Dragging up makes the lane taller.
-    const delta = drag.y - event.clientY;
-    applyLaneHeight(clamp(drag.height + delta, laneMin, laneMax));
-  };
-
-  const onLaneGripUp = (event: React.PointerEvent<HTMLDivElement>) => {
-    const drag = laneDragRef.current;
-    if (!drag || drag.pointer !== event.pointerId) return;
-    laneDragRef.current = null;
-    setDraggingLane(false);
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-  };
+  const laneDrag = useDrag<{ y: number; height: number }>(
+    (event) => {
+      if (!props.onLaneHeightChange) return null;
+      setDraggingLane(true);
+      return { y: event.clientY, height: props.laneHeight ?? 0 };
+    },
+    (context, event) => {
+      // Dragging up makes the lane taller.
+      applyLaneHeight(clamp(context.height + (context.y - event.clientY), laneMin, laneMax));
+    },
+    () => setDraggingLane(false),
+  );
 
   // ---- row-height box -------------------------------------------------------
-
-  const onHeightHandleDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    heightDragRef.current = { y: event.clientY, height: rowHeight, pointer: event.pointerId };
-    setDraggingHeight(true);
-  };
 
   /**
    * Row-height dragging re-lays out for real on every frame.
@@ -652,22 +604,17 @@ export function TimelineView(props: TimelineViewProps) {
    */
   const applyRowHeight = useRafCallback<number>((value) => onRowHeightChange(value));
 
-  const onHeightHandleMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    const drag = heightDragRef.current;
-    if (!drag || drag.pointer !== event.pointerId) return;
-    const delta = drag.y - event.clientY; // dragging up makes rows taller
-    applyRowHeight(clamp(drag.height + delta, minRowHeight, maxRowHeight));
-  };
-
-  const onHeightHandleUp = (event: React.PointerEvent<HTMLDivElement>) => {
-    const drag = heightDragRef.current;
-    if (!drag || drag.pointer !== event.pointerId) return;
-    heightDragRef.current = null;
-    setDraggingHeight(false);
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-  };
+  const heightDrag = useDrag<{ y: number; height: number }>(
+    (event) => {
+      setDraggingHeight(true);
+      return { y: event.clientY, height: rowHeight };
+    },
+    (context, event) => {
+      // Dragging up makes rows taller.
+      applyRowHeight(clamp(context.height + (context.y - event.clientY), minRowHeight, maxRowHeight));
+    },
+    () => setDraggingHeight(false),
+  );
 
   return (
     <div
@@ -691,10 +638,10 @@ export function TimelineView(props: TimelineViewProps) {
               : '')
           }
           ref={viewportRef}
-          onPointerDown={beginOverviewDrag}
-          onPointerMove={onOverviewDragMove}
-          onPointerUp={endOverviewDrag}
-          onPointerCancel={endOverviewDrag}
+          onPointerDown={overviewDrag.onPointerDown}
+          onPointerMove={overviewDrag.onPointerMove}
+          onPointerUp={overviewDrag.onPointerUp}
+          onPointerCancel={overviewDrag.onPointerCancel}
         >
           {/* Cursor affordances only; the parent does the hit-testing. */}
           <span className="ov-edge ov-edge-left" />
@@ -712,10 +659,10 @@ export function TimelineView(props: TimelineViewProps) {
             // Chromium starts its auto-scroll widget on middle mousedown.
             if (event.button === 1) event.preventDefault();
           }}
-          onPointerDown={beginPan}
-          onPointerMove={movePan}
-          onPointerUp={endPan}
-          onPointerCancel={endPan}
+          onPointerDown={panDrag.onPointerDown}
+          onPointerMove={panDrag.onPointerMove}
+          onPointerUp={panDrag.onPointerUp}
+          onPointerCancel={panDrag.onPointerCancel}
           onAuxClick={(event) => event.button === 1 && event.preventDefault()}
         >
           <div
@@ -747,10 +694,10 @@ export function TimelineView(props: TimelineViewProps) {
                 aria-orientation="horizontal"
                 aria-label="调整当前显示条高度"
                 title="上下拖动改变高度"
-                onPointerDown={onLaneGripDown}
-                onPointerMove={onLaneGripMove}
-                onPointerUp={onLaneGripUp}
-                onPointerCancel={onLaneGripUp}
+                onPointerDown={laneDrag.onPointerDown}
+                onPointerMove={laneDrag.onPointerMove}
+                onPointerUp={laneDrag.onPointerUp}
+                onPointerCancel={laneDrag.onPointerCancel}
               />
             )}
             {props.laneHeader && <div className="tl-lane-head">{props.laneHeader}</div>}
@@ -763,6 +710,7 @@ export function TimelineView(props: TimelineViewProps) {
         )}
 
         <div
+          ref={heightHandleRef}
           className={'tl-vresize' + (draggingHeight ? ' active' : '')}
           role="slider"
           tabIndex={0}
@@ -771,10 +719,10 @@ export function TimelineView(props: TimelineViewProps) {
           aria-valuemin={minRowHeight}
           aria-valuemax={maxRowHeight}
           title="上下拖动改变行高"
-          onPointerDown={onHeightHandleDown}
-          onPointerMove={onHeightHandleMove}
-          onPointerUp={onHeightHandleUp}
-          onPointerCancel={onHeightHandleUp}
+          onPointerDown={heightDrag.onPointerDown}
+          onPointerMove={heightDrag.onPointerMove}
+          onPointerUp={heightDrag.onPointerUp}
+          onPointerCancel={heightDrag.onPointerCancel}
           onKeyDown={(event) => {
             const step = event.shiftKey ? 4 : 1;
             if (event.key === 'ArrowUp') {

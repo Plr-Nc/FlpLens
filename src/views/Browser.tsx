@@ -146,7 +146,7 @@ export function Browser(props: {
               title={`${pattern.notes.length} 个音符 · 编排中出现 ${uses} 次`}
             >
               <span className="dot" style={{ background: pattern.color ?? 'var(--pattern)' }} />
-              <span className="name">{pattern.name || `Pattern ${pattern.index + 1}`}</span>
+              <span className="name">{pattern.name || `样式 ${pattern.index + 1}`}</span>
               <span className="meta">{pattern.notes.length}</span>
             </div>
           ))}

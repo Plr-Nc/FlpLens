@@ -453,8 +453,21 @@ export function parseFlp(bytes: Uint8Array, profileOverride?: FlpProfile): Proje
       }
       case EVENT.NEW_PATTERN: {
         const index = size === 2 ? u16At(payload, 0) : patterns.length;
-        currentPattern = { index, name: '', color: null, notes: [] };
-        patterns.push(currentPattern);
+        /*
+         * FL emits NEW_PATTERN once per pattern *slot*, including slots whose
+         * pattern was deleted — a real 74-pattern project contains 135 of these
+         * events, 61 of them repeats of an index already seen. Appending blindly
+         * created duplicate entries with the same index, so selecting one lit up
+         * two rows in the browser (it looks like a parent/child clone pair, but
+         * it is purely a parsing artefact).
+         *
+         * Reuse the existing entry. Its notes are preserved: PATTERN_NOTES blobs
+         * are appended, and each index carries at most one blob, so the second
+         * NEW_PATTERN never has data of its own to merge.
+         */
+        const existing = patterns.find((pattern) => pattern.index === index);
+        currentPattern = existing ?? { index, name: '', color: null, notes: [] };
+        if (!existing) patterns.push(currentPattern);
         break;
       }
       case EVENT.PATTERN_NAME:
