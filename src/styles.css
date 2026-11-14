@@ -1,22 +1,112 @@
+/*
+ * Design tokens.
+ *
+ * Depth is expressed as four background steps rather than shadows: a DAW is a
+ * flat instrument panel, and stacking drop shadows on every region reads as a
+ * web dashboard. Hairlines are one step above their surface, and the top of each
+ * raised surface gets a 1px inner highlight — that is what makes a panel look
+ * machined instead of coloured in.
+ */
 :root {
   --font-scale: 1;
-  --bg: #14161a;
-  --panel: #1b1f27;
-  --panel-2: #212632;
-  --line: #2c3341;
-  --text: #dfe4ec;
-  --muted: #8b94a5;
+
+  /* surfaces, darkest to lightest */
+  --bg: #0d1015;
+  --panel: #131820;
+  --panel-2: #1a212b;
+  --panel-3: #222b37;
+  --panel-4: #2b3644;
+
+  /* separators */
+  --line: #222b36;
+  --line-strong: #32404f;
+  --highlight: rgba(255, 255, 255, 0.045);
+
+  /* type */
+  --text: #e6ecf5;
+  --text-dim: #a8b3c2;
+  --muted: #75808f;
+  --faint: #4e5866;
+
+  /* accents */
   --accent: #4a9eff;
+  --accent-soft: rgba(74, 158, 255, 0.14);
+  --accent-line: rgba(74, 158, 255, 0.55);
   --pattern: #4a9eff;
-  --audio: #45c08a;
+  --audio: #3fbf87;
   --automation: #e8a33d;
   --danger: #e05c5c;
   --warn: #e8a33d;
-  --radius: 6px;
+
+  /* motion — only opacity/transform are ever animated, so nothing reflows */
+  --dur-fast: 110ms;
+  --dur-base: 170ms;
+  --dur-slow: 240ms;
+  --ease-out: cubic-bezier(0.22, 0.8, 0.32, 1);
+  --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* metrics */
+  --radius: 5px;
+  --radius-sm: 3px;
+  --row-h-compact: 22px;
+  --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* Keyboard focus gets a soft ring; mouse focus stays invisible. */
+:focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 1px;
+  transition: outline-color var(--dur-fast) var(--ease-out);
+}
+
+@keyframes flp-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes flp-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes flp-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/*
+ * Honour the OS setting. A DAW-style UI has a lot of small state changes; for
+ * anyone who gets motion sick from them this must be a real switch, not a
+ * reduced duration.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 html,
@@ -35,10 +125,19 @@ body {
   overflow: hidden;
 }
 
-/* Slim, theme-matched scrollbars — the Windows default is far too heavy here. */
+/*
+ * Slim scrollbars that stay out of the way: the thumb is nearly invisible at
+ * rest and fades in when the container is hovered or focused. A DAW's viewport
+ * is the content; a permanently visible grey bar makes it look like a document.
+ */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #333c4c transparent;
+  scrollbar-color: transparent transparent;
+}
+
+*:hover,
+*:focus-within {
+  scrollbar-color: rgba(120, 135, 155, 0.45) transparent;
 }
 
 ::-webkit-scrollbar {
@@ -88,6 +187,11 @@ button:hover {
   border-color: var(--accent);
 }
 
+button:not(.tabs button):active:not(:disabled) {
+  transform: scale(0.97);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
 button.active {
   background: var(--accent);
   border-color: var(--accent);
@@ -104,45 +208,65 @@ button.active {
 header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
+  gap: 10px;
+  padding: 0 14px;
+  height: 44px;
   border-bottom: 1px solid var(--line);
-  background: var(--panel);
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  box-shadow: inset 0 1px 0 var(--highlight);
   flex: 0 0 auto;
 }
 
 .brand {
-  font-weight: 700;
-  letter-spacing: 0.5px;
+  font-weight: 650;
+  font-size: calc(14px * var(--font-scale));
+  letter-spacing: -0.01em;
+  color: var(--text);
+  display: flex;
+  align-items: baseline;
 }
 
 .brand span {
-  color: var(--muted);
+  color: var(--faint);
   font-weight: 400;
-  margin-left: 8px;
-  font-size: calc(12px * var(--font-scale));
+  margin-left: 9px;
+  font-size: calc(11px * var(--font-scale));
+  letter-spacing: 0.02em;
 }
 
 .spacer {
   flex: 1;
 }
 
+header .badge:not(.ok):not(.warn) {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .badge {
-  font-size: calc(11px * var(--font-scale));
+  animation: flp-rise var(--dur-base) var(--ease-out);
+  font-size: calc(10.5px * var(--font-scale));
   padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  color: var(--muted);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
 }
 
 .badge.ok {
   color: var(--audio);
-  border-color: var(--audio);
+  border-color: rgba(63, 191, 135, 0.45);
+  background: rgba(63, 191, 135, 0.08);
 }
 
 .badge.warn {
   color: var(--warn);
-  border-color: var(--warn);
+  border-color: rgba(232, 163, 61, 0.45);
+  background: rgba(232, 163, 61, 0.08);
 }
 
 .drop {
@@ -167,7 +291,26 @@ header {
 }
 
 /* Shown while a file is hovering anywhere over the window. */
+@keyframes flp-drop-in {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(2px);
+  }
+}
+
+@keyframes flp-march {
+  to {
+    background-position: 24px 0, -24px 0, 0 -24px, 0 24px;
+  }
+}
+
 .drop-overlay {
+  animation: flp-drop-in var(--dur-base) var(--ease-out);
+  backdrop-filter: blur(2px);
   position: fixed;
   inset: 0;
   z-index: 50;
@@ -249,9 +392,13 @@ main {
 }
 
 .split-divider:hover,
-.split-divider:focus-visible,
+.split-divider:focus-visible {
+  background: var(--accent-line);
+}
+
 .split-divider.active {
   background: var(--accent);
+  box-shadow: 0 0 12px rgba(74, 158, 255, 0.45);
 }
 
 .split-dragging {
@@ -351,10 +498,12 @@ aside {
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 4px 10px;
+  height: var(--row-h-compact);
+  padding: 0 9px 0 8px;
   font-size: calc(12px * var(--font-scale));
   cursor: pointer;
   border-left: 2px solid transparent;
+  transition: background 90ms var(--ease);
 }
 
 /* Hover and selected used the same background, so sweeping the pointer over the
@@ -364,9 +513,42 @@ aside {
   background: rgba(255, 255, 255, 0.035);
 }
 
+.browser-item:active {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.browser-item {
+  position: relative;
+}
+
+/*
+ * A relative + pseudo-element bar can animate; `border-left-color` cannot. The
+ * bar grows from the centre outward, which makes selection read as a state
+ * change rather than a jump cut.
+ */
 .browser-item.selected {
-  background: rgba(74, 158, 255, 0.16);
-  border-left-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.browser-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 2px;
+  height: 0;
+  background: var(--accent);
+  border-radius: 0 1px 1px 0;
+  transform: translateY(-50%);
+  transition: height var(--dur-fast) var(--ease-out);
+}
+
+.browser-item.selected::before {
+  height: 100%;
+}
+
+.browser-item.selected .dot {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25);
 }
 
 .browser-item.selected .name {
@@ -375,8 +557,8 @@ aside {
 }
 
 .browser-item .dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 2px;
   flex: 0 0 auto;
 }
@@ -402,11 +584,18 @@ aside {
 }
 
 .aside-head {
-  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 30px;
+  padding: 0 12px;
   border-bottom: 1px solid var(--line);
-  font-size: calc(11px * var(--font-scale));
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  box-shadow: inset 0 1px 0 var(--highlight);
+  font-size: calc(10px * var(--font-scale));
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.09em;
   color: var(--muted);
 }
 
@@ -432,24 +621,55 @@ input.filter:focus {
 }
 
 .channel {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 12px;
+  height: 24px;
+  padding: 0 10px 0 8px;
   cursor: pointer;
-  border-left: 3px solid transparent;
+  border-left: 2px solid transparent;
+  transition: background 90ms var(--ease);
+}
+
+.channel::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 2px;
+  height: 0;
+  background: var(--accent);
+  border-radius: 0 1px 1px 0;
+  transform: translateY(-50%);
+  transition: height var(--dur-fast) var(--ease-out);
+}
+
+.channel.selected::before {
+  height: 100%;
 }
 
 .channel:hover {
   background: var(--panel-2);
 }
 
+.channel:active {
+  background: var(--panel-3);
+}
+
 .channel.selected {
-  background: var(--panel-2);
+  background: var(--accent-soft);
   border-left-color: var(--accent);
 }
 
 .channel .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.channel .dot-orig {
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -464,8 +684,9 @@ input.filter:focus {
 }
 
 .channel .kind {
-  font-size: calc(10px * var(--font-scale));
-  color: var(--muted);
+  font-size: calc(9.5px * var(--font-scale));
+  color: var(--faint);
+  letter-spacing: 0.02em;
 }
 
 .content {
@@ -478,15 +699,57 @@ input.filter:focus {
 
 .tabs {
   display: flex;
-  gap: 6px;
-  padding: 8px 12px;
+  gap: 2px;
+  padding: 0 10px;
+  height: 38px;
   border-bottom: 1px solid var(--line);
   background: var(--panel);
   flex: 0 0 auto;
-  align-items: center;
+  align-items: stretch;
+}
+/*
+ * Tabs are page selectors, not buttons. The global `button.active` paints a
+ * solid accent block, which reads as "pressed" and is what made the whole
+ * header feel like a web form. Here the active tab is a recessed surface with a
+ * thin accent rule on its top edge — the way a hardware panel shows which
+ * section is live.
+ */
+.tabs button {
+  position: relative;
+  padding: 0 13px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: calc(12px * var(--font-scale));
+  letter-spacing: 0.01em;
+  transition: color 120ms var(--ease), background 120ms var(--ease);
+}
+
+.tabs button:hover {
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text-dim);
+  border-color: transparent;
+}
+
+.tabs button.active {
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: inset 0 1px 0 var(--highlight);
+}
+
+.tabs button.active::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 10px rgba(74, 158, 255, 0.55);
 }
 
 .panel {
+  animation: flp-rise var(--dur-base) var(--ease-out);
   flex: 1;
   overflow: auto;
   padding: 16px;
@@ -520,6 +783,9 @@ input.filter:focus {
 }
 
 .section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: calc(12px * var(--font-scale));
   color: var(--muted);
   text-transform: uppercase;
@@ -559,8 +825,11 @@ input.filter:focus {
 .ov-clip {
   position: absolute;
   border-radius: 1px;
-  opacity: 0.78;
+  opacity: 0.9;
   min-height: 1px;
+  /* Slight top-lit gradient: flat blocks look like spreadsheet cells, a 6%
+     gradient reads as a clipped region of audio. */
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 70%);
 }
 
 .ov-clip.pattern {
@@ -591,6 +860,18 @@ input.filter:focus {
   border: 1px solid var(--accent);
   background: rgba(74, 158, 255, 0.14);
   border-radius: 2px;
+  transition: background var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.tl-overview-view:hover {
+  background: rgba(74, 158, 255, 0.22);
+}
+
+.tl-overview-view.drag-pan,
+.tl-overview-view.drag-resize {
+  background: rgba(74, 158, 255, 0.3);
+  box-shadow: 0 0 0 1px rgba(74, 158, 255, 0.5), 0 2px 10px rgba(0, 0, 0, 0.45);
 }
 
 /* Middle drags the view; the two edges change how much is visible. */
@@ -696,6 +977,31 @@ input.filter:focus {
   min-height: 100%;
 }
 
+/*
+ * A DAW's empty area is still a canvas. Without this the arrange view below the
+ * last track is a dead rectangle; a 1px grid at 1.5% opacity reads as "empty
+ * bars" and gives the eye a scale reference.
+ */
+.arr-timeline .tl-content {
+  background-image:
+    repeating-linear-gradient(
+      to right,
+      rgba(255, 255, 255, 0.028) 0 1px,
+      transparent 1px 100%
+    );
+  background-size: 25% 100%;
+}
+
+.pr-timeline .tl-content {
+  background-image:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.022) 0 1px,
+      transparent 1px 100%
+    );
+  background-size: 100% var(--row-h);
+}
+
 /* Row-height cell: a full-height block at the ruler's right end, separated by a
    visible edge and carrying a three-line glyph that reads as "row height". */
 /* Row-height cell: pinned to the top-right of the viewport, above the scroller
@@ -771,15 +1077,15 @@ input.filter:focus {
 }
 
 .arr-row:nth-child(even) {
-  background: rgba(255, 255, 255, 0.016);
+  background: rgba(255, 255, 255, 0.022);
 }
 
 .arr-track-name {
   position: sticky;
   left: 0;
   display: inline-block;
-  width: 78px;
-  padding: 0 5px;
+  width: 96px;
+  padding: 0 7px 0 6px;
   font-size: calc(9px * var(--font-scale));
   color: var(--muted);
   background: var(--panel);
@@ -795,7 +1101,12 @@ input.filter:focus {
   position: absolute;
   top: 2px;
   border-radius: 2px;
-  opacity: 0.86;
+  opacity: 0.82;
+  transition: opacity var(--dur-fast) var(--ease-out),
+    filter var(--dur-fast) var(--ease-out);
+  /* Knocks the saturation down a notch so a dense arrangement reads as a
+     texture rather than a colour chart. */
+  filter: saturate(0.78) brightness(0.96);
   overflow: hidden;
   white-space: nowrap;
   font-size: calc(9px * var(--font-scale));
@@ -817,10 +1128,16 @@ input.filter:focus {
   background: var(--automation);
 }
 
+.arr-clip:hover {
+  opacity: 0.95;
+  filter: saturate(0.85) brightness(1.08);
+}
+
 .arr-clip.selected {
   outline: 1px solid #fff;
   outline-offset: -1px;
   z-index: 2;
+  opacity: 1;
 }
 
 /* ---------- piano roll ---------- */
@@ -985,6 +1302,8 @@ pre.report {
 }
 
 footer {
+  display: flex;
+  align-items: center;
   flex: 0 0 auto;
   padding: 6px 16px;
   border-top: 1px solid var(--line);
@@ -995,6 +1314,7 @@ footer {
 /* ---------- style view (piano roll + fixed inspector) ---------- */
 
 .style-view {
+  animation: flp-rise var(--dur-base) var(--ease-out);
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
@@ -1179,6 +1499,8 @@ footer {
 }
 
 .settings-panel {
+  animation: flp-pop var(--dur-base) var(--ease-out);
+  will-change: transform, opacity;
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
@@ -1448,6 +1770,8 @@ footer {
 }
 
 .export-panel {
+  animation: flp-pop var(--dur-base) var(--ease-out);
+  will-change: transform, opacity;
   /* Positioned from JS (portalled to body) so it is not clipped by the
      scrollable style header. */
   position: fixed;

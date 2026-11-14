@@ -292,12 +292,87 @@ export function TimelineView(props: TimelineViewProps) {
     [applyScroll],
   );
 
+  /**
+   * Critically-damped follow, not a fixed-duration tween.
+   *
+   * A tween restarts from the current value on every wheel notch, so a burst of
+   * notches spends the whole gesture "catching up" and reads as sluggish. Here
+   * each notch only advances the *target*; the animation loop always moves the
+   * live value a fraction of the remaining distance toward it. Back-to-back
+   * notches therefore compound smoothly, and the last frame that matters is
+   * three or four frames after the wheel stops — roughly 50 ms, which is under
+   * the threshold where a delay feels like lag.
+   *
+   * The earlier flicker came from two rAF loops committing against each other;
+   * there is only ever one loop here, and `stepZoom` writes scale and offset in
+   * a single synchronous commit.
+   */
+  const zoomTarget = useRef(props.initialPxPerBeat);
+  const zoomRaf = useRef(0);
+  const zoomAnchor = useRef({ tick: 0, offset: 0 });
+
+  const cancelZoomAnim = useCallback(() => {
+    if (zoomRaf.current) {
+      cancelAnimationFrame(zoomRaf.current);
+      zoomRaf.current = 0;
+    }
+    zoomTarget.current = pxPerBeatRef.current;
+  }, []);
+
+  useEffect(() => () => cancelZoomAnim(), [cancelZoomAnim]);
+
+  /*
+   * Fraction of the remaining distance covered per frame, and the point at which
+   * the remainder is invisible enough to snap. 0.62 / 0.4 % puts 90 % of the
+   * travel into three frames (~50 ms) and finishes inside five — under the
+   * threshold where a wheel starts to feel laggy, while still removing the
+   * hard jump.
+   */
+  const FOLLOW = 0.62;
+  const FOLLOW_EPSILON = 0.004;
+
+  const easedZoom = useCallback(
+    (next: number, anchorTick: number, offset: number) => {
+      if (!props.smoothZoom) {
+        zoomTarget.current = next;
+        stepZoom(next, leading + anchorTick * (next / ppq) - offset);
+        return;
+      }
+
+      // The anchor follows the newest notch; the value keeps chasing the target.
+      zoomTarget.current = next;
+      zoomAnchor.current = { tick: anchorTick, offset };
+
+      if (zoomRaf.current) return; // loop already running
+
+      const frame = () => {
+        const current = pxPerBeatRef.current;
+        const target = zoomTarget.current;
+        const diff = target - current;
+
+        if (Math.abs(diff) <= Math.abs(target) * FOLLOW_EPSILON) {
+          zoomRaf.current = 0;
+          stepZoom(target, leading + zoomAnchor.current.tick * (target / ppq) - zoomAnchor.current.offset);
+          return;
+        }
+
+        const value = current + diff * FOLLOW;
+        stepZoom(value, leading + zoomAnchor.current.tick * (value / ppq) - zoomAnchor.current.offset);
+        zoomRaf.current = requestAnimationFrame(frame);
+      };
+
+      zoomRaf.current = requestAnimationFrame(frame);
+    },
+    [props.smoothZoom, stepZoom, leading, ppq],
+  );
+
   /** Set zoom + left edge directly (used by edge-dragging the viewport box). */
   const applyView = useCallback(
     (leftTick: number, visibleTicks: number) => {
       const scroll = scrollRef.current;
       if (!scroll) return;
       cancelSmoothPan();
+      cancelZoomAnim();
       const viewPx = scroll.clientWidth || 1;
       /*
        * Dragging the box edges must stay continuous right up to the ends of the
@@ -340,20 +415,16 @@ export function TimelineView(props: TimelineViewProps) {
       const offset = clientX - rect.left;
       const pxPerTickNow = current / ppq;
       const tickUnderCursor = (column.read() + offset - leading) / pxPerTickNow;
-      const target = leading + tickUnderCursor * (next / ppq) - offset;
 
       /*
-       * Clamp rather than bail out. Refusing the step made the wheel dead at
-       * both ends of the song, which reads as "zooming is broken here" — much
-       * worse than the few pixels of anchor drift clamping costs.
+       * The anchor is passed down rather than a scroll target: `easedZoom`
+       * re-derives the offset from it on every frame, and `applyScroll` clamps.
+       * Refusing the step when the anchor was unreachable is what used to make
+       * the wheel dead at both ends of the song.
        */
-      const nextContentWidth = leading + props.totalTicks * (next / ppq) + TAIL_SPACE;
-      const nextMaxScroll = Math.max(0, nextContentWidth - scroll.clientWidth);
-      const bounded = Math.min(Math.max(target, 0), nextMaxScroll);
-
-      stepZoom(next, bounded);
+      easedZoom(next, tickUnderCursor, offset);
     },
-    [ppq, leading, cancelSmoothPan, fillPxPerBeat, stepZoom, props.minPxPerBeat, props.maxPxPerBeat],
+    [ppq, leading, cancelSmoothPan, fillPxPerBeat, easedZoom, props.minPxPerBeat, props.maxPxPerBeat],
   );
 
   /**
@@ -368,9 +439,11 @@ export function TimelineView(props: TimelineViewProps) {
   const zoomByWheel = useCallback(
     (clientX: number, deltaY: number) => {
       // Clamp a single notch: trackpads can emit very large deltas, and one
-      // huge factor is exactly what a "sudden jump" feels like.
-      const step = Math.max(-120, Math.min(120, deltaY));
-      zoomAt(clientX, Math.exp(-step * 0.0009));
+      // huge factor is exactly what a "sudden jump" feels like. 0.0013 gives
+      // ~13 % per notch, close to FL's own step; the damped follow above is what
+      // makes it feel smooth, not a small step.
+      const step = Math.max(-160, Math.min(160, deltaY));
+      zoomAt(clientX, Math.exp(-step * 0.0013));
     },
     [zoomAt],
   );

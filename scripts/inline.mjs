@@ -7,7 +7,7 @@
  * request, so it runs. Result: dist/flplens.html works offline, anywhere.
  */
 
-import { readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 const dist = 'dist';
@@ -43,12 +43,4 @@ const out = join(dist, 'flplens.html');
 writeFileSync(out, html);
 console.log(`wrote ${out} (${(html.length / 1024).toFixed(0)} KB, ${inlinedJs} script, ${inlinedCss} style)`);
 
-/*
- * Everything the bundle needed is now inside flplens.html, so the split build's
- * leftovers are just noise: keeping them means `dist/` contains a stale
- * index.html that loads the same code again, and it makes the two build modes
- * look additive when they are meant to be exclusive.
- */
-for (const leftover of ['index.html', 'assets']) {
-  rmSync(join(dist, leftover), { recursive: true, force: true });
-}
+

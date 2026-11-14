@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import type { Project } from '../flp/project.ts';
 import { TimelineView } from '../components/TimelineView.tsx';
 
-const TRACK_HEAD = 78;
+const TRACK_HEAD = 96;
 const MIN_ROW = 10;
 const MAX_ROW = 56;
 
