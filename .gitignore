@@ -1,0 +1,13 @@
+node_modules/
+dist/
+*.local
+.DS_Store
+Thumbs.db
+
+# local capture / scratch files
+_*.png
+scripts/_*.mjs
+test-results/
+
+# local design notes, not published
+planning/
