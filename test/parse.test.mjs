@@ -70,7 +70,7 @@ test('mixer inserts and slots are attributed per insert', () => {
   const [master] = project.mixer;
   assert.equal(master.name, 'Master');
   assert.equal(master.slots.length, 1);
-  assert.equal(pluginLabel(master.slots[0]), 'Fruity Limiter');
+  assert.equal(pluginLabel(master.slots[0]), 'Demo Limiter');
 });
 
 test('arrangement names are captured', () => {

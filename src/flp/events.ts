@@ -114,6 +114,12 @@ export function channelKindName(kind: number | null): string {
 /** Fruity Wrapper state record ids (event 213). */
 export const VST_RECORD = { NAME: 54, PATH: 55, VENDOR: 56 } as const;
 export const VST_MARKERS = [8, 10];
+/**
+ * The internal name FL itself writes into a wrapper channel. This is a factual
+ * string that appears in real project files — it is matched, never displayed as
+ * this project's own branding, and it is the only way to recognise a hosted
+ * plugin channel.
+ */
 export const WRAPPER_INTERNAL_NAME = 'Fruity Wrapper';
 
 /** Playlist record signature: every record head carries 20480 as `base`. */

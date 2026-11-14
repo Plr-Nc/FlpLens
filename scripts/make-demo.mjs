@@ -97,14 +97,14 @@ const CLIPS = [
 
 // insert 0 is always Master in FL.
 const INSERTS = [
-  { name: 'Master', color: 0x007e6e68, slots: ['Fruity Limiter'] },
-  { name: 'Drums', color: 0x00e05c5c, slots: ['Fruity Parametric EQ 2', 'Fruity Compressor'] },
-  { name: 'Bass', color: 0x004a9eff, slots: ['Fruity Parametric EQ 2'] },
-  { name: 'Synth', color: 0x00e8a33d, slots: ['Fruity Reeverb 2', 'Fruity Delay 3'] },
-  { name: 'Vocal', color: 0x009b7fd6, slots: ['Fruity Parametric EQ 2', 'Fruity Compressor'] },
-  { name: 'FX', color: 0x0045c08a, slots: ['Fruity Reeverb 2'] },
-  { name: 'Bus', color: 0x007f8fa6, slots: ['Fruity Soft Clipper'] },
-  { name: 'Send', color: 0x00c0a04a, slots: ['Fruity Reeverb 2'] },
+  { name: 'Master', color: 0x007e6e68, slots: ['Demo Limiter'] },
+  { name: 'Drums', color: 0x00e05c5c, slots: ['Demo EQ 2', 'Demo Comp'] },
+  { name: 'Bass', color: 0x004a9eff, slots: ['Demo EQ 2'] },
+  { name: 'Synth', color: 0x00e8a33d, slots: ['Demo Reverb', 'Demo Delay'] },
+  { name: 'Vocal', color: 0x009b7fd6, slots: ['Demo EQ 2', 'Demo Comp'] },
+  { name: 'FX', color: 0x0045c08a, slots: ['Demo Reverb'] },
+  { name: 'Bus', color: 0x007f8fa6, slots: ['Demo Clipper'] },
+  { name: 'Send', color: 0x00c0a04a, slots: ['Demo Reverb'] },
 ];
 
 const events = [
@@ -128,7 +128,7 @@ const events = [
       event(219, [...u32(pan), ...u32(volume), ...u32(0), ...new Array(12).fill(0)]),
     );
     if (channel.vst) {
-      out.push(event(201, utf16('Fruity Wrapper')));
+      out.push(event(201, utf16('Plugin Wrapper')));
       out.push(event(203, utf16(channel.name)));
       out.push(event(213, vstState(channel.vst)));
     } else if (channel.kind === 4) {
@@ -173,7 +173,7 @@ const events = [
     });
     // An empty tail slot, so the UI's "loaded only" filter has something to do.
     out.push(event(98, u16(insert.slots.length)));
-    if (insertIndex === 0) out.push(event(201, utf16('Fruity Balance')));
+    if (insertIndex === 0) out.push(event(201, utf16('Demo Balance')));
     return out;
   }),
 ];

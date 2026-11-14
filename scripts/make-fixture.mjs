@@ -29,7 +29,7 @@ const events = [
   event(64, u16(0)), // new channel 0
   event(21, [2]), // instrument
   event(128, u32(0x00c396d4)), // colour (0x00BBGGRR)
-  event(201, utf16('Fruity Wrapper')),
+  event(201, utf16('Plugin Wrapper')),
   event(203, utf16('Test Synth')),
 
   event(65, u16(0)), // new pattern 0
@@ -45,7 +45,7 @@ const events = [
   event(204, utf16('Master')),
   event(149, u32(0x007e6e68)),
   event(98, u16(0)),
-  event(201, utf16('Fruity Limiter')),
+  event(201, utf16('Demo Limiter')),
 ];
 
 const bytes = wrapFlp(events, { numChannels: 1, ppq: 96 });
