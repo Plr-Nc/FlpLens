@@ -1,0 +1,79 @@
+name: 打不开 / 解析出错
+description: 某个 .flp 打不开、通道数不对、音符缺失、编排错位
+title: "[解析] "
+labels: ["parsing"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        先做一件事：**不要上传工程文件本身**。
+        这个工具在本地解析，你在页面上看到的内容就是我能看到的全部。
+        诊断报告已经刻意剔除了工程名、通道名、文件路径，可以直接贴。
+
+  - type: textarea
+    id: report
+    attributes:
+      label: 诊断报告
+      description: 打开工程 → 切到「诊断」标签 → 点「复制诊断报告」，粘贴到这里。
+      placeholder: |
+        FlpLens diagnostics
+        -------------------
+        file size ...
+        version ...
+      render: text
+    validations:
+      required: true
+
+  - type: dropdown
+    id: symptom
+    attributes:
+      label: 症状
+      description: 哪一部分和你在 FL Studio 里看到的不一样？
+      multiple: true
+      options:
+        - 完全打不开（红色错误条）
+        - 能打开但通道数不对
+        - 通道名字丢失或错乱
+        - 编排里的片段位置或长度不对
+        - 样式（pattern）列表数量不对
+        - 音符缺失、音高或时值不对
+        - 混音台 insert 或效果器不对
+        - 界面卡顿或卡死
+    validations:
+      required: true
+
+  - type: input
+    id: fl-version
+    attributes:
+      label: FL Studio 版本
+      description: 工程是哪个版本保存的？FL 里「帮助 → 关于」可以看到。
+      placeholder: "例如 25.1.4.4951"
+    validations:
+      required: true
+
+  - type: input
+    id: flplens-version
+    attributes:
+      label: FlpLens 版本
+      description: 页面标题右边会显示（或者看你下载的 Release 标签）。
+      placeholder: "例如 v0.1.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 你期望看到什么
+      description: 用 FL Studio 打开同一个工程时，它是什么样？
+      placeholder: "该工程有 42 个通道，FlpLens 只显示了 12 个。"
+    validations:
+      required: true
+
+  - type: textarea
+    id: console
+    attributes:
+      label: 浏览器控制台输出（可选）
+      description: 按 F12 → Console，如果有红色报错，截图或粘贴。
+      render: text
+    validations:
+      required: false

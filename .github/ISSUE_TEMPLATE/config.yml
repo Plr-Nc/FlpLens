@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 想先看看效果，不打算提 issue
+    url: https://github.com/Plr-Nc/FlpLens#想先看看效果
+    about: 仓库自带一个合成的示例工程，直接打开就能体验，不需要自己的 .flp。
+  - name: 安全或隐私问题
+    url: https://github.com/Plr-Nc/FlpLens/security/advisories/new
+    about: 如果发现任何可能泄露工程内容或上传数据的路径，请走私密报告，不要开公开 issue。

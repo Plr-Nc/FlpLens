@@ -1,0 +1,57 @@
+name: 功能建议
+description: 希望 FlpLens 增加什么能力
+title: "[建议] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        先说清楚边界，能省掉来回沟通：
+
+        **在范围内**：只读地展示 `.flp` 里的信息（编排、样式、通道、混音台、导出你自己的音符数据）。
+
+        **不在范围内**：写回或修改工程、版本降级、格式转换、解析第三方 VST 的加密状态块、复刻 FL Studio 的界面。
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 你现在遇到什么问题
+      description: 描述场景，而不是直接给方案。
+      placeholder: "我想把某个样式的音符导到另一个 DAW，现在只能一个个抄。"
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: 你想到的做法
+      description: 如果有具体的交互设想，写在这里。
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 涉及哪一块
+      multiple: true
+      options:
+        - 解析层（读文件）
+        - 编排视图
+        - 样式 / 钢琴卷帘
+        - 通道机架
+        - 混音台
+        - 导出
+        - 界面 / 交互
+        - 其他
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: scope-check
+    attributes:
+      label: 自查
+      options:
+        - label: 这个功能不涉及写回或修改 `.flp`
+          required: true
+        - label: 这个功能不需要解密或绕过任何访问控制
+          required: true
