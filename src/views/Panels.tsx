@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Channel, Project } from '../flp/project.ts';
 import { channelKindName } from '../flp/events.ts';
+import { buildInventory } from '../flp/insight.ts';
 
 const KIND_COLOR: Record<number, string> = {
   0: '#7f8fa6',
@@ -73,7 +74,17 @@ export function ChannelList(props: {
 export function Overview(props: { project: Project; fileName: string }) {
   const { project } = props;
   const notes = project.patterns.reduce((sum, pattern) => sum + pattern.notes.length, 0);
-  const vstCount = project.channels.filter((channel) => channel.vst).length;
+  /*
+   * Counting only channels that carry a readable plugin name understated the
+   * rack badly: FL stores some plugin records without a name field, and its own
+   * devices live under `internalName` instead. The overview shows the same three
+   * categories the insight page does, so the two views cannot disagree.
+   */
+  const inventory = buildInventory(project);
+  const deviceCount =
+    inventory.stats.pluginChannels +
+    inventory.stats.unidentifiedChannels +
+    inventory.stats.nativeChannels;
   const cards: Array<[string, string]> = [
     ['工程名', project.meta.title || '（未命名）'],
     ['文件', props.fileName],
@@ -88,7 +99,7 @@ export function Overview(props: { project: Project; fileName: string }) {
     ['编配', project.arrangements
       .map((index) => project.arrangementNames.get(index) || `#${index + 1}`)
       .join(' / ')],
-    ['第三方插件', `${vstCount} 个`],
+    ['插件与设备', `${deviceCount} 个通道`],
     ['混音台', `${project.mixer.length} insert`],
     ['文件大小', `${(project.byteLength / 1024).toFixed(0)} KB`],
   ];
@@ -135,24 +146,48 @@ export function Overview(props: { project: Project; fileName: string }) {
         </>
       )}
 
-      <div className="section-title">插件（{vstCount}）</div>
-      {vstCount === 0 ? (
-        <div className="empty">这个工程没有第三方 VST</div>
+      <div className="section-title">
+        插件与设备（{deviceCount} 个通道）
+      </div>
+      {deviceCount === 0 ? (
+        <div className="empty">这个工程没有加载任何插件或乐器</div>
       ) : (
         <div className="grid">
-          {project.channels
-            .filter((channel) => channel.vst)
-            .map((channel) => (
-              <div className="card" key={channel.index}>
-                <div className="label">{channel.name}</div>
-                <div className="value" style={{ fontSize: 13 }}>
-                  {channel.vst!.name}
-                </div>
-                <div className="label" style={{ marginTop: 4 }}>
-                  {channel.vst!.vendor || '未知厂商'}
-                </div>
+          {inventory.plugins.map((plugin) => (
+            <div className="card" key={`vst|${plugin.name}`}>
+              <div className="label label-name">{plugin.name}</div>
+              <div className="value" style={{ fontSize: 13 }}>
+                {plugin.channels.length} 个通道
               </div>
-            ))}
+              <div className="label" style={{ marginTop: 4 }}>
+                {plugin.vendor || 'VST'}
+              </div>
+            </div>
+          ))}
+          {inventory.unidentifiedPlugins.map((plugin) => (
+            <div className="card" key={`unknown|${plugin.wrapper}`}>
+              <div className="label label-name" style={{ color: 'var(--warn)' }}>
+                {plugin.wrapper}
+              </div>
+              <div className="value" style={{ fontSize: 13 }}>
+                {plugin.channels.length} 个通道
+              </div>
+              <div className="label" style={{ marginTop: 4 }}>
+                VST · 名称未读到
+              </div>
+            </div>
+          ))}
+          {inventory.nativeDevices.map((device) => (
+            <div className="card" key={`native|${device.name}`}>
+              <div className="label label-name">{device.name}</div>
+              <div className="value" style={{ fontSize: 13 }}>
+                {device.channels.length} 个通道
+              </div>
+              <div className="label" style={{ marginTop: 4 }}>
+                FL 原生
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

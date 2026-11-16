@@ -2459,3 +2459,83 @@ footer {
 .insight-block-body > .section-title:first-child {
   display: none;
 }
+
+/* ---------- insight layout tightening ---------- */
+
+/* Fixed columns so six tiles fill two even rows instead of leaving an orphan
+   on the second line; the note is clamped to one line so tiles in a row match
+   height regardless of how much text each carries. */
+.insight-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 1180px) {
+  .insight-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.insight-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 74px;
+  padding: 10px 12px;
+}
+
+.insight-stat .label {
+  font-size: calc(9.5px * var(--font-scale));
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.insight-stat .value {
+  font-size: calc(21px * var(--font-scale));
+  line-height: 1.15;
+}
+
+.insight-stat .note {
+  margin-top: auto;
+  font-size: calc(9.5px * var(--font-scale));
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Block bodies get a consistent rhythm; the old margins were per-element. */
+.insight-block-body > *:last-child {
+  margin-bottom: 0;
+}
+
+.insight-block-body .insight-grid {
+  margin-bottom: 0;
+}
+
+.insight-row {
+  margin-bottom: 0;
+}
+
+.insight-row + .insight-hint-block {
+  margin-top: 8px;
+}
+
+/* Section titles inside a block no longer need their own top gap. */
+.insight-block-body > .section-title {
+  margin-top: 0;
+}
+
+/* Plugin and device names keep their original casing; only the small caption
+   labels are uppercased. */
+.card .label.label-name {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: calc(10.5px * var(--font-scale));
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
