@@ -15,13 +15,22 @@ export type SaveOptions = {
   /** Extension with the leading dot, e.g. '.json'. */
   extension: string;
   description: string;
+  /**
+   * Prefix a UTF-8 BOM.
+   *
+   * Excel assumes the system codepage for `.csv` unless a BOM is present; with
+   * Chinese headers and no BOM it renders the whole file as one garbled line —
+   * which is indistinguishable from an empty export. JSON and Markdown are read
+   * by tools that default to UTF-8, so they do not need it.
+   */
+  bom?: boolean;
 };
 
 export async function saveGeneratedFile(
   text: string,
   options: SaveOptions,
 ): Promise<SaveOutcome> {
-  const bytes = new TextEncoder().encode(text);
+  const bytes = new TextEncoder().encode(options.bom ? `\uFEFF${text}` : text);
 
   const picker = (
     window as unknown as {

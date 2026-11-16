@@ -2279,3 +2279,47 @@ footer {
   margin: -4px 0 14px;
   line-height: 1.55;
 }
+
+.insight-intro {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  font-size: calc(11.5px * var(--font-scale));
+  line-height: 1.65;
+  color: var(--text-dim);
+}
+
+.insight-intro > b {
+  color: var(--text);
+  font-size: calc(12px * var(--font-scale));
+}
+
+.insight-intro ol {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.insight-intro li {
+  margin-bottom: 6px;
+}
+
+.insight-intro li b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.insight-intro code {
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  font-size: calc(10.5px * var(--font-scale));
+  color: var(--text-dim);
+}
+
+.insight-stat .note {
+  line-height: 1.35;
+}

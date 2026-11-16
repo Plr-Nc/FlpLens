@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { parseFlp } from '../flp/project.ts';
 import type { Project } from '../flp/project.ts';
 import {
   buildInventory,
@@ -62,6 +63,8 @@ export function Insight(props: { project: Project; fileName: string | null }) {
         mime: 'text/csv',
         extension: '.csv',
         description: which === 'plugins' ? '插件清单' : '采样清单',
+        // Excel only honours UTF-8 when the file starts with a BOM.
+        bom: true,
       });
       setStatus(
         outcome === 'cancelled' ? '已取消' : `已导出 ${rows} 条 ${which === 'plugins' ? '插件' : '采样'}记录`,
@@ -79,13 +82,29 @@ export function Insight(props: { project: Project; fileName: string | null }) {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
-    const parsed = parseSnapshot(await file.text());
-    if (!parsed) {
-      setStatus('这不是 FlpLens 的快照文件');
+
+    let snapshot: Snapshot | null = null;
+
+    if (/\.flp$/i.test(file.name)) {
+      // Comparing two projects directly is the common case; requiring a manual
+      // snapshot export first was a pointless extra step.
+      try {
+        const other = parseFlp(new Uint8Array(await file.arrayBuffer()));
+        snapshot = buildSnapshot(other, file.name);
+      } catch (error) {
+        setStatus(`无法解析 ${file.name}：${error instanceof Error ? error.message : '未知错误'}`);
+        return;
+      }
+    } else {
+      snapshot = parseSnapshot(await file.text());
+    }
+
+    if (!snapshot) {
+      setStatus('这个文件既不是 .flp，也不是 FlpLens 快照');
       return;
     }
-    if (slot.current === 'before') setBefore(parsed);
-    else setAfter(parsed);
+    if (slot.current === 'before') setBefore(snapshot);
+    else setAfter(snapshot);
     setStatus(`已载入 ${file.name}`);
   };
 
@@ -108,10 +127,30 @@ export function Insight(props: { project: Project; fileName: string | null }) {
       <input
         ref={fileInput}
         type="file"
-        accept=".json,application/json"
+        accept=".flp,.json,application/json"
         style={{ display: 'none' }}
         onChange={onPick}
       />
+
+      <div className="insight-intro">
+        <b>这个页面回答三个问题</b>
+        <ol>
+          <li>
+            <b>两个工程差在哪？</b>
+            选两个 <code>.flp</code>，直接列出变化的通道、音量、BPM、音符数。
+            FL 没有这个功能——改完一周后你通常记不清自己动过什么。
+          </li>
+          <li>
+            <b>这个工程依赖什么？</b>
+            用了哪些插件、哪些采样文件。换电脑、重装系统、拔移动硬盘之前先看一眼，
+            比在 FL 里一个个点弹窗强。
+          </li>
+          <li>
+            <b>哪里浪费了？</b>
+            空样式、没发声的通道、同一采样被加载多次——删掉能减小体积、少占内存。
+          </li>
+        </ol>
+      </div>
 
       {/* ---- snapshot export ------------------------------------------- */}
       <div className="section-title">轨道状态快照</div>
@@ -133,14 +172,14 @@ export function Insight(props: { project: Project; fileName: string | null }) {
           <b>之前</b>
           <span className="insight-slot-name">{before ? before.file.name || before.createdAt.slice(0, 10) : '未选择'}</span>
         </span>
-        <button onClick={() => loadSlot('before')}>载入…</button>
+        <button onClick={() => loadSlot('before')}>选 .flp…</button>
         <button onClick={() => useCurrentAsSnapshot('before')}>用当前</button>
         <span className="insight-arrow">→</span>
         <span className="insight-slot">
           <b>之后</b>
           <span className="insight-slot-name">{after ? after.file.name || after.createdAt.slice(0, 10) : '未选择'}</span>
         </span>
-        <button onClick={() => loadSlot('after')}>载入…</button>
+        <button onClick={() => loadSlot('after')}>选 .flp…</button>
         <button onClick={() => useCurrentAsSnapshot('after')}>用当前</button>
       </div>
 
@@ -173,30 +212,30 @@ export function Insight(props: { project: Project; fileName: string | null }) {
       </div>
 
       <div className="insight-grid">
-        <Stat label="第三方插件" value={inventory.plugins.length} note="独立插件数" />
-        <Stat label="采样文件" value={inventory.samples.length} note="独立路径数" />
+        <Stat label="第三方插件" value={inventory.plugins.length} note="换电脑时要装的" />
+        <Stat label="采样文件" value={inventory.samples.length} note={`独立路径 · ${inventory.stats.sampleChannels} 个通道引用`} />
         <Stat
           label="空样式"
           value={inventory.unusedPatterns.length}
-          note="无音符且无引用"
+          note="没音符也没被用，可删"
           warn={inventory.unusedPatterns.length > 0}
         />
         <Stat
           label="闲置通道"
           value={inventory.orphanChannels.length}
-          note="无音符、无片段"
+          note="不发声，占着机架位置"
           warn={inventory.orphanChannels.length > 0}
         />
         <Stat
           label="重复采样"
           value={inventory.duplicatedSamples.length}
-          note="同一样本多次加载"
+          note="同一文件被加载多次"
           warn={inventory.duplicatedSamples.length > 0}
         />
         <Stat
           label="无声样式"
           value={inventory.silentPatterns.length}
-          note="有引用但没音符"
+          note="编排里有片段但没内容"
           warn={inventory.silentPatterns.length > 0}
         />
       </div>
