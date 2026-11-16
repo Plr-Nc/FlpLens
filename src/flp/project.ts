@@ -241,7 +241,25 @@ export function pluginLabel(slot: { internalName: string; name: string; vst: Flp
   return '';
 }
 
-export function parseFlp(bytes: Uint8Array, profileOverride?: FlpProfile): Project {
+export type ParseOptions = {
+  /**
+   * Parse structure (channels, patterns, playlist, mixer) even when the FL
+   * version has no verified profile.
+   *
+   * Off by default: an unknown layout can produce confidently wrong output —
+   * channels that silently lose notes, inserts in the wrong order — and a viewer
+   * that shows plausible nonsense is worse than one that says "I don't know
+   * this version". The UI exposes a switch that turns it on for people who want
+   * to try anyway.
+   */
+  forceUnverified?: boolean;
+};
+
+export function parseFlp(
+  bytes: Uint8Array,
+  profileOverride?: FlpProfile,
+  options: ParseOptions = {},
+): Project {
   const diag = createDiagnostics();
   const channels: Channel[] = [];
   const patterns: Pattern[] = [];
@@ -253,6 +271,8 @@ export function parseFlp(bytes: Uint8Array, profileOverride?: FlpProfile): Proje
   const timeMarkers: TimeMarker[] = [];
   const meta: ProjectMeta = { ...EMPTY_META, timeSignature: { ...EMPTY_META.timeSignature } };
   let profile = profileOverride ?? resolveProfile('');
+  /** Set when an unverified version stops the structural pass. */
+  let stoppedEarly = false;
 
   const empty = (): Project => ({
     meta,
@@ -317,6 +337,7 @@ export function parseFlp(bytes: Uint8Array, profileOverride?: FlpProfile): Proje
   };
 
   while (reader.pos < dataEnd) {
+    if (stoppedEarly) break;
     const offset = reader.pos;
     const id = reader.u8();
     let size: number;
@@ -349,8 +370,19 @@ export function parseFlp(bytes: Uint8Array, profileOverride?: FlpProfile): Proje
             code: 'UNKNOWN_VERSION',
             severity: 'warn',
             eventId: id,
-            message: `no verified profile for FL ${meta.version || '(empty)'} (using ${profile.id})`,
+            message: options.forceUnverified
+              ? `no verified profile for FL ${meta.version || '(empty)'} — parsing anyway (${profile.id})`
+              : `no verified profile for FL ${meta.version || '(empty)'} — metadata only, structure skipped`,
           });
+          if (!options.forceUnverified) {
+            /*
+             * Stop before the structural pass. The header has already been read
+             * into `meta`, so the caller still gets version, tempo and channel
+             * count; everything beyond that is guesswork for an unknown layout.
+             */
+            stoppedEarly = true;
+            break;
+          }
         }
         break;
       }

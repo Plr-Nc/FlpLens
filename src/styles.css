@@ -2539,3 +2539,42 @@ footer {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* The unverified-version badge doubles as a switch. */
+.badge-button {
+  cursor: pointer;
+  font-family: inherit;
+  transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+
+.badge-button:hover {
+  background: rgba(232, 163, 61, 0.18);
+  border-color: var(--warn);
+}
+
+/* Shown when an unverified FL version was opened without forcing a parse. */
+.unverified-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 12px 0;
+  padding: 10px 13px;
+  border: 1px solid rgba(232, 163, 61, 0.35);
+  border-left: 2px solid var(--warn);
+  border-radius: var(--radius);
+  background: rgba(232, 163, 61, 0.07);
+  color: var(--text-dim);
+  font-size: calc(11.5px * var(--font-scale));
+  line-height: 1.6;
+}
+
+.unverified-notice b {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.unverified-notice button {
+  margin-left: auto;
+  flex: 0 0 auto;
+}

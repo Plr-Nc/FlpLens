@@ -26,6 +26,21 @@ export function App() {
   // Reading a 46 MB file is async; if two drops land close together the slower
   // one must not overwrite the newer one.
   const loadSeq = useRef(0);
+  /**
+   * Original bytes of the open file, kept so the unverified-version switch can
+   * re-parse without asking the user to pick the file again.
+   */
+  const rawBytes = useRef<Uint8Array | null>(null);
+  const [forceUnverified, setForceUnverified] = useState(false);
+
+  /** Re-run the parser on the open file with the opposite unverified setting. */
+  const toggleForceUnverified = useCallback(() => {
+    const bytes = rawBytes.current;
+    if (!bytes) return;
+    const next = !forceUnverified;
+    setForceUnverified(next);
+    setProject(parseFlp(bytes, undefined, { forceUnverified: next }));
+  }, [forceUnverified]);
 
   const load = useCallback(async (file: File) => {
     setError('');
@@ -41,7 +56,8 @@ export function App() {
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
       if (seq !== loadSeq.current) return; // a newer file already won
-      const parsed = parseFlp(bytes);
+      rawBytes.current = bytes;
+      const parsed = parseFlp(bytes, undefined, { forceUnverified });
       // A file we cannot parse must never replace a project that is already
       // open — otherwise a mis-drop throws away what the user was looking at.
       if (hasFatal(parsed.diagnostics)) {
@@ -166,7 +182,19 @@ export function App() {
           FlpLens<span>FL Studio 工程查看器</span>
         </div>
         {project && <span className="badge ok">{project.meta.version || 'unknown'}</span>}
-        {project && !project.profile.verified && <span className="badge warn">未验证版本</span>}
+        {project && !project.profile.verified && (
+          <button
+            className="badge warn badge-button"
+            onClick={toggleForceUnverified}
+            title={
+              forceUnverified
+                ? '当前显示的是未验证版本的解析结果，可能不准。点击改回只读元数据'
+                : '这个 FL 版本没有验证过的解析规则。点击强制尝试解析结构'
+            }
+          >
+            {forceUnverified ? '未验证版本 · 已强制解析' : '未验证版本 · 仅元数据'}
+          </button>
+        )}
         {project && fatal > 0 && <span className="badge warn">{fatal} 个致命问题</span>}
         <div className="spacer" />
         <span className="badge">{fileName || '未打开文件'}</span>
@@ -273,6 +301,15 @@ export function App() {
                 </select>
               )}
             </div>
+
+            {project && !project.profile.verified && !forceUnverified && (
+              <div className="unverified-notice">
+                <b>这个 FL 版本没有验证过的解析规则。</b>
+                默认只读取了文件头（版本、BPM、拍号、通道数），编排、样式、混音台都没有解析。
+                解析未知布局可能悄悄丢数据或错位，所以没有默认打开。
+                <button onClick={toggleForceUnverified}>仍然尝试解析</button>
+              </div>
+            )}
 
             {tab === 'insight' && <Insight project={project} fileName={fileName} />}
 

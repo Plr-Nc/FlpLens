@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { detectPlaylistStride, parseFlp, parseNotes, pluginLabel } from '../src/flp/project.ts';
+import { resolveProfile } from '../src/flp/profiles.ts';
 import { buildReport, hasFatal } from '../src/flp/diagnostics.ts';
 import { colorToHex } from '../src/flp/events.ts';
 
@@ -144,4 +145,20 @@ test('diagnostics report carries no project content', () => {
   for (const secret of [project.meta.title, project.meta.comment, project.channels[0].name]) {
     if (secret && secret.length > 3) assert.equal(report.includes(secret), false, `leaked ${secret}`);
   }
+});
+
+test('unverified versions skip structure unless forced', () => {
+  const bytes = new Uint8Array(fixture);
+  // Pretend the file came from a version with no verified profile.
+  const legacy = resolveProfile('20.0.0.1');
+  assert.equal(legacy.verified, false);
+
+  const metadataOnly = parseFlp(bytes, legacy, { forceUnverified: false });
+  assert.equal(metadataOnly.meta.ppq, 96, 'header is still read');
+  assert.equal(metadataOnly.channels.length, 0, 'structure is skipped');
+  assert.equal(metadataOnly.patterns.length, 0);
+
+  const forced = parseFlp(bytes, legacy, { forceUnverified: true });
+  assert.ok(forced.channels.length > 0, 'forcing parses the structure');
+  assert.equal(forced.meta.ppq, 96);
 });
