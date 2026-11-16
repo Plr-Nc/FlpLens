@@ -7,8 +7,6 @@ import {
   formatPan,
   formatVolume,
   parseSnapshot,
-  pluginsToCsv,
-  samplesToCsv,
   snapshotToMarkdown,
 } from '../src/flp/insight.ts';
 
@@ -180,25 +178,43 @@ test('markdown lists every channel with its state', () => {
   assert.match(md, /C:\/kick\.wav/);
 });
 
-test('plugin CSV quotes fields containing commas and quotes', () => {
+test('third-party plugins whose name is missing are still reported', () => {
   const p = project({
     channels: [
-      channel(0, { name: 'A, B', vst: { name: 'Synth "Pro"', vendor: 'ACME, Inc', path: 'C:/x.dll' } }),
+      channel(0, { name: 'Serum', internalName: 'Fruity Wrapper' }),
+      channel(1, { name: 'Serum #2', internalName: 'Fruity Wrapper' }),
+      channel(2, { name: 'Phase Plant', internalName: 'Fruity Wrapper' }),
+      channel(3, { name: 'Keyscape', internalName: 'Fruity Wrapper', vst: { name: 'Keyscape', vendor: 'Spectrasonics', path: '' } }),
     ],
   });
-  const lines = pluginsToCsv(buildInventory(p), p).split('\r\n');
-  assert.equal(lines[0], '插件,厂商,路径,通道数,通道');
-  // 内嵌逗号和引号都必须转义，否则 Excel 会拆错列
-  assert.ok(lines[1].startsWith('"Synth ""Pro""","ACME, Inc",C:/x.dll,1,'));
-  assert.ok(lines[1].endsWith('"A, B"'));
+  const inv = buildInventory(p);
+  // The one with a readable name is its own entry.
+  assert.equal(inv.plugins.length, 1);
+  // The rest are grouped by channel name, with the clone suffix stripped.
+  assert.equal(inv.stats.unidentifiedChannels, 3);
+  const serum = inv.unidentifiedPlugins.find((u) => u.wrapper === 'Serum');
+  assert.deepEqual(serum.channels, [0, 1]);
+  const phase = inv.unidentifiedPlugins.find((u) => u.wrapper === 'Phase Plant');
+  assert.deepEqual(phase.channels, [2]);
 });
 
-test('sample CSV exposes the file name next to the full path', () => {
+test("FL's own devices are counted separately from third-party plugins", () => {
   const p = project({
-    channels: [channel(0, { name: 'Kick', samplePath: 'D:/Samples/kicks/kick_01.wav' })],
+    channels: [
+      channel(0, { name: '3x Osc', internalName: '3x Osc' }),
+      channel(1, { name: '3x Osc #2', internalName: '3x Osc' }),
+      channel(2, { name: 'Slicex', internalName: 'Slicex' }),
+    ],
   });
-  const csv = samplesToCsv(buildInventory(p), p);
-  const lines = csv.split('\r\n');
-  assert.equal(lines[0], '路径,文件名,通道数,通道');
-  assert.match(lines[1], /D:\/Samples\/kicks\/kick_01\.wav,kick_01\.wav,1,Kick/);
+  const inv = buildInventory(p);
+  assert.equal(inv.plugins.length, 0);
+  assert.equal(inv.unidentifiedPlugins.length, 0);
+  assert.deepEqual(
+    inv.nativeDevices.map((d) => [d.name, d.channels.length]),
+    [
+      ['3x Osc', 2],
+      ['Slicex', 1],
+    ],
+  );
+  assert.equal(inv.stats.nativeChannels, 3);
 });

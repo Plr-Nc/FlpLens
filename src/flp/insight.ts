@@ -10,11 +10,32 @@ import { channelKindName } from './events.ts';
  * user's own file already says.
  */
 
+/**
+ * A third-party plugin whose identity could not be read.
+ *
+ * FL stores plugin records in several layouts. Only some of them carry a
+ * readable name field; the rest expose an opaque identifier instead. Those
+ * channels still have a plugin loaded — reporting them as "no plugin" was
+ * wrong, and it is why the inventory looked like it was missing most of the
+ * rack.
+ */
+export type UnidentifiedPlugin = {
+  /** The wrapper name FL wrote, e.g. "Fruity Wrapper". */
+  wrapper: string;
+  channels: number[];
+};
+
 export type PluginUsage = {
   name: string;
   vendor: string;
   path: string;
   /** Channel indices that load this plugin. */
+  channels: number[];
+};
+
+/** A generator or effect that ships with FL Studio, identified by internal name. */
+export type NativeDevice = {
+  name: string;
   channels: number[];
 };
 
@@ -33,6 +54,10 @@ export type PatternUsage = {
 
 export type Inventory = {
   plugins: PluginUsage[];
+  /** Channels wrapped around a third-party plugin whose name could not be read. */
+  unidentifiedPlugins: UnidentifiedPlugin[];
+  /** FL's own generators/effects, e.g. 3x Osc, Slicex. */
+  nativeDevices: NativeDevice[];
   samples: SampleUsage[];
   /** Patterns with no notes that no clip references. */
   unusedPatterns: PatternUsage[];
@@ -48,6 +73,10 @@ export type Inventory = {
     notes: number;
     clips: number;
     pluginChannels: number;
+    /** Channels wrapping a plugin whose name could not be resolved. */
+    unidentifiedChannels: number;
+    /** Channels running one of FL's built-in devices. */
+    nativeChannels: number;
     sampleChannels: number;
   };
 };
@@ -81,6 +110,43 @@ export function buildInventory(project: Project): Inventory {
   for (const item of project.playlist) {
     if (item.channel !== null) usedChannels.add(item.channel);
   }
+
+  /*
+   * Channels split into three groups, because FL represents them three ways:
+   *   - a third-party plugin whose name was readable   → `vst`
+   *   - a third-party plugin whose record had no name  → internalName "Fruity Wrapper"
+   *   - one of FL's own devices                        → internalName "3x Osc" etc.
+   * Counting only the first group is what made the rack look almost empty.
+   */
+  const nativeDevicesRaw = project.channels.filter(
+    (channel) => !channel.vst && channel.internalName && channel.internalName !== 'Fruity Wrapper',
+  );
+  const unidentifiedRaw = project.channels.filter(
+    (channel) => !channel.vst && channel.internalName === 'Fruity Wrapper',
+  );
+
+  const nativeGroups = groupBy(nativeDevicesRaw, (channel) => channel.internalName);
+  const nativeDevices: NativeDevice[] = [...nativeGroups.entries()]
+    .map(([name, channels]) => ({ name, channels: channels.map((c) => c.index) }))
+    .sort((a, b) => b.channels.length - a.channels.length);
+
+  /*
+   * The plugin record for these channels carries no readable name, but users
+   * usually rename the channel to the plugin anyway ("Serum", "Phase Plant").
+   * Grouping by that name makes the list actionable — it is a guess derived from
+   * the channel label, and it is labelled as such in the UI rather than being
+   * presented as fact.
+   */
+  const stripCloneSuffix = (name: string) => name.replace(/\s*#\d+$/, '').trim();
+  const unidentifiedGroups = groupBy(unidentifiedRaw, (channel) =>
+    stripCloneSuffix(channel.name || ''),
+  );
+  const unidentifiedPlugins: UnidentifiedPlugin[] = [...unidentifiedGroups.entries()]
+    .map(([hint, channels]) => ({
+      wrapper: hint || '（通道未命名）',
+      channels: channels.map((c) => c.index),
+    }))
+    .sort((a, b) => b.channels.length - a.channels.length);
 
   const pluginGroups = groupBy(
     project.channels.filter((channel) => channel.vst),
@@ -126,6 +192,8 @@ export function buildInventory(project: Project): Inventory {
 
   return {
     plugins,
+    unidentifiedPlugins,
+    nativeDevices,
     samples,
     unusedPatterns,
     orphanChannels,
@@ -137,6 +205,8 @@ export function buildInventory(project: Project): Inventory {
       notes: project.patterns.reduce((sum, p) => sum + p.notes.length, 0),
       clips: project.playlist.length,
       pluginChannels: project.channels.filter((channel) => channel.vst).length,
+      unidentifiedChannels: unidentifiedRaw.length,
+      nativeChannels: nativeDevicesRaw.length,
       sampleChannels: project.channels.filter((channel) => channel.samplePath).length,
     },
   };
@@ -370,49 +440,4 @@ export function parseSnapshot(text: string): Snapshot | null {
   } catch {
     return null;
   }
-}
-
-/* -------------------------------------------------------------------------- */
-/* csv exports                                                                 */
-/* -------------------------------------------------------------------------- */
-
-/** Quote a CSV cell, doubling embedded quotes. */
-function cell(value: string | number | null): string {
-  if (value === null) return '';
-  const text = String(value);
-  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-}
-
-export function pluginsToCsv(inventory: Inventory, project: Project): string {
-  const names = new Map(project.channels.map((channel) => [channel.index, channel.name]));
-  const rows = [['插件', '厂商', '路径', '通道数', '通道'].join(',')];
-  for (const plugin of inventory.plugins) {
-    rows.push(
-      [
-        cell(plugin.name),
-        cell(plugin.vendor),
-        cell(plugin.path),
-        cell(plugin.channels.length),
-        cell(plugin.channels.map((index) => names.get(index) ?? `#${index}`).join(' / ')),
-      ].join(','),
-    );
-  }
-  return rows.join('\r\n');
-}
-
-export function samplesToCsv(inventory: Inventory, project: Project): string {
-  const names = new Map(project.channels.map((channel) => [channel.index, channel.name]));
-  const rows = [['路径', '文件名', '通道数', '通道'].join(',')];
-  for (const sample of inventory.samples) {
-    const fileName = sample.path.split(/[\\/]/).pop() ?? sample.path;
-    rows.push(
-      [
-        cell(sample.path),
-        cell(fileName),
-        cell(sample.channels.length),
-        cell(sample.channels.map((index) => names.get(index) ?? `#${index}`).join(' / ')),
-      ].join(','),
-    );
-  }
-  return rows.join('\r\n');
 }

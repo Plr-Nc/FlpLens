@@ -6,8 +6,6 @@ import {
   buildSnapshot,
   diffSnapshots,
   parseSnapshot,
-  pluginsToCsv,
-  samplesToCsv,
   snapshotToMarkdown,
   type DiffEntry,
   type Snapshot,
@@ -54,25 +52,6 @@ export function Insight(props: { project: Project; fileName: string | null }) {
     [project, fileName, baseName],
   );
 
-  const exportCsv = useCallback(
-    async (which: 'plugins' | 'samples') => {
-      const text =
-        which === 'plugins' ? pluginsToCsv(inventory, project) : samplesToCsv(inventory, project);
-      const rows = which === 'plugins' ? inventory.plugins.length : inventory.samples.length;
-      const outcome = await saveGeneratedFile(text, {
-        name: `${baseName}.${which}.csv`,
-        mime: 'text/csv',
-        extension: '.csv',
-        description: which === 'plugins' ? '插件清单' : '采样清单',
-        // Excel only honours UTF-8 when the file starts with a BOM.
-        bom: true,
-      });
-      setStatus(
-        outcome === 'cancelled' ? '已取消' : `已导出 ${rows} 条 ${which === 'plugins' ? '插件' : '采样'}记录`,
-      );
-    },
-    [inventory, project, baseName],
-  );
 
   const loadSlot = (which: 'before' | 'after') => {
     slot.current = which;
@@ -159,17 +138,17 @@ export function Insight(props: { project: Project; fileName: string | null }) {
         <button onClick={() => exportSnapshot('json')}>导出 JSON</button>
         <button onClick={() => exportSnapshot('md')}>导出清单 (Markdown)</button>
         <button onClick={() => setPreview(preview === 'plugins' ? null : 'plugins')}>
-          {preview === 'plugins' ? '收起插件' : '查看插件'}
+          {preview === 'plugins' ? '收起设备' : '查看设备'}
         </button>
-        <button onClick={() => exportCsv('plugins')}>插件 CSV</button>
+
         <button onClick={() => setPreview(preview === 'samples' ? null : 'samples')}>
           {preview === 'samples' ? '收起采样' : '查看采样'}
         </button>
-        <button onClick={() => exportCsv('samples')}>采样 CSV</button>
+
       </div>
       <div className="insight-hint insight-hint-block">
         快照记录每个通道的音量、声像、插件和采样，纯文本、可进 git、可跨工程比对。
-        CSV 适合拿去备份或重装系统后逐项对照。
+        明细可以直接在下面查看，不需要导出文件。
       </div>
 
       {/* ---- diff ------------------------------------------------------ */}
@@ -211,22 +190,35 @@ export function Insight(props: { project: Project; fileName: string | null }) {
       )}
 
       {/* ---- inline preview ---------------------------------------------
-          Renders the same rows the CSV contains, so the data can be checked
-          (and copied) without depending on how a spreadsheet app parses the
-          file. */}
+          The same rows the table below summarises, rendered directly so the
+          data can be checked without any file round-trip. */}
       {preview && (
         <>
           <div className="section-title">
-            {preview === 'plugins' ? `插件清单（${inventory.plugins.length}）` : `采样清单（${inventory.samples.length}）`}
-            <span className="insight-count">共 {preview === 'plugins' ? inventory.plugins.length : inventory.samples.length} 行</span>
+            {preview === 'plugins'
+              ? `插件与设备（${
+                  inventory.plugins.length +
+                  inventory.unidentifiedPlugins.length +
+                  inventory.nativeDevices.length
+                } 类 / ${
+                  inventory.stats.pluginChannels +
+                  inventory.stats.unidentifiedChannels +
+                  inventory.stats.nativeChannels
+                } 个通道）`
+              : `采样清单（${inventory.samples.length}）`}
+            <span className="insight-count">
+              {preview === 'plugins'
+                ? `VST ${inventory.plugins.length} 种 · 名称未读到 ${inventory.stats.unidentifiedChannels} 个 · FL 原生 ${inventory.nativeDevices.length} 种`
+                : `${inventory.stats.sampleChannels} 个通道引用`}
+            </span>
           </div>
           <div className="insight-preview">
             {preview === 'plugins' ? (
               <table>
                 <thead>
                   <tr>
-                    <th>插件</th>
-                    <th>厂商</th>
+                    <th>名称</th>
+                    <th>来源</th>
                     <th>通道数</th>
                     <th>通道</th>
                     <th>路径</th>
@@ -234,16 +226,50 @@ export function Insight(props: { project: Project; fileName: string | null }) {
                 </thead>
                 <tbody>
                   {inventory.plugins.map((plugin) => (
-                    <tr key={`${plugin.name}|${plugin.vendor}`}>
+                    <tr key={`vst|${plugin.name}|${plugin.vendor}`}>
                       <td>{plugin.name}</td>
-                      <td>{plugin.vendor || '—'}</td>
+                      <td className="dim">{plugin.vendor || 'VST'}</td>
                       <td>{plugin.channels.length}</td>
                       <td className="dim">
                         {plugin.channels
                           .map((index) => project.channels.find((c) => c.index === index)?.name ?? `#${index}`)
                           .join(' / ')}
                       </td>
-                      <td className="dim path">{plugin.path || '—'}</td>
+                      <td className="dim path" title={plugin.path}>
+                        {plugin.path || '—'}
+                      </td>
+                    </tr>
+                  ))}
+                  {inventory.unidentifiedPlugins.map((plugin) => (
+                    <tr key={`unknown|${plugin.wrapper}`} className="row-unidentified">
+                      <td>{plugin.wrapper}</td>
+                      <td className="dim" title="FL 的插件记录里没有可读名称，这里用的是通道名">
+                        VST · 名称未读到
+                      </td>
+                      <td>{plugin.channels.length}</td>
+                      <td className="dim">
+                        {plugin.channels
+                          .slice(0, 6)
+                          .map((index) => project.channels.find((c) => c.index === index)?.name ?? `#${index}`)
+                          .join(' / ')}
+                        {plugin.channels.length > 6 ? ` … 另 ${plugin.channels.length - 6} 个` : ''}
+                      </td>
+                      <td className="dim">—</td>
+                    </tr>
+                  ))}
+                  {inventory.nativeDevices.map((device) => (
+                    <tr key={`native|${device.name}`}>
+                      <td>{device.name}</td>
+                      <td className="dim">FL 原生</td>
+                      <td>{device.channels.length}</td>
+                      <td className="dim">
+                        {device.channels
+                          .slice(0, 6)
+                          .map((index) => project.channels.find((c) => c.index === index)?.name ?? `#${index}`)
+                          .join(' / ')}
+                        {device.channels.length > 6 ? ` … 另 ${device.channels.length - 6} 个` : ''}
+                      </td>
+                      <td className="dim">—</td>
                     </tr>
                   ))}
                 </tbody>
@@ -287,7 +313,15 @@ export function Insight(props: { project: Project; fileName: string | null }) {
       </div>
 
       <div className="insight-grid">
-        <Stat label="第三方插件" value={inventory.plugins.length} note="换电脑时要装的" />
+        <Stat
+          label="插件与设备"
+          value={
+            inventory.plugins.length +
+            inventory.unidentifiedPlugins.length +
+            inventory.nativeDevices.length
+          }
+          note={`VST ${inventory.plugins.length} 种 · 名称未读到 ${inventory.stats.unidentifiedChannels} 个`}
+        />
         <Stat label="采样文件" value={inventory.samples.length} note={`独立路径 · ${inventory.stats.sampleChannels} 个通道引用`} />
         <Stat
           label="空样式"
