@@ -2323,3 +2323,59 @@ footer {
 .insight-stat .note {
   line-height: 1.35;
 }
+
+/* On-page inventory tables: the same rows the CSV carries, so the data is
+   verifiable (and copyable) without depending on a spreadsheet app's parsing. */
+.insight-preview {
+  max-height: 420px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin-bottom: 14px;
+  background: var(--panel);
+}
+
+.insight-preview table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: calc(11px * var(--font-scale));
+}
+
+.insight-preview thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 6px 10px;
+  text-align: left;
+  background: var(--panel-2);
+  color: var(--muted);
+  font-weight: 500;
+  font-size: calc(10px * var(--font-scale));
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.insight-preview td {
+  padding: 4px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  color: var(--text-dim);
+}
+
+.insight-preview tbody tr:nth-child(odd) td {
+  background: rgba(255, 255, 255, 0.014);
+}
+
+.insight-preview td.dim {
+  color: var(--muted);
+}
+
+.insight-preview td.path {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: calc(10px * var(--font-scale));
+  max-width: 380px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

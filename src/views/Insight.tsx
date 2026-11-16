@@ -27,6 +27,7 @@ export function Insight(props: { project: Project; fileName: string | null }) {
   const [status, setStatus] = useState('');
   const [before, setBefore] = useState<Snapshot | null>(null);
   const [after, setAfter] = useState<Snapshot | null>(null);
+  const [preview, setPreview] = useState<'plugins' | 'samples' | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const slot = useRef<'before' | 'after'>('before');
 
@@ -157,7 +158,13 @@ export function Insight(props: { project: Project; fileName: string | null }) {
       <div className="insight-row">
         <button onClick={() => exportSnapshot('json')}>导出 JSON</button>
         <button onClick={() => exportSnapshot('md')}>导出清单 (Markdown)</button>
+        <button onClick={() => setPreview(preview === 'plugins' ? null : 'plugins')}>
+          {preview === 'plugins' ? '收起插件' : '查看插件'}
+        </button>
         <button onClick={() => exportCsv('plugins')}>插件 CSV</button>
+        <button onClick={() => setPreview(preview === 'samples' ? null : 'samples')}>
+          {preview === 'samples' ? '收起采样' : '查看采样'}
+        </button>
         <button onClick={() => exportCsv('samples')}>采样 CSV</button>
       </div>
       <div className="insight-hint insight-hint-block">
@@ -201,6 +208,74 @@ export function Insight(props: { project: Project; fileName: string | null }) {
             ))}
           </div>
         )
+      )}
+
+      {/* ---- inline preview ---------------------------------------------
+          Renders the same rows the CSV contains, so the data can be checked
+          (and copied) without depending on how a spreadsheet app parses the
+          file. */}
+      {preview && (
+        <>
+          <div className="section-title">
+            {preview === 'plugins' ? `插件清单（${inventory.plugins.length}）` : `采样清单（${inventory.samples.length}）`}
+            <span className="insight-count">共 {preview === 'plugins' ? inventory.plugins.length : inventory.samples.length} 行</span>
+          </div>
+          <div className="insight-preview">
+            {preview === 'plugins' ? (
+              <table>
+                <thead>
+                  <tr>
+                    <th>插件</th>
+                    <th>厂商</th>
+                    <th>通道数</th>
+                    <th>通道</th>
+                    <th>路径</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {inventory.plugins.map((plugin) => (
+                    <tr key={`${plugin.name}|${plugin.vendor}`}>
+                      <td>{plugin.name}</td>
+                      <td>{plugin.vendor || '—'}</td>
+                      <td>{plugin.channels.length}</td>
+                      <td className="dim">
+                        {plugin.channels
+                          .map((index) => project.channels.find((c) => c.index === index)?.name ?? `#${index}`)
+                          .join(' / ')}
+                      </td>
+                      <td className="dim path">{plugin.path || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>文件名</th>
+                    <th>通道数</th>
+                    <th>通道</th>
+                    <th>路径</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {inventory.samples.map((sample) => (
+                    <tr key={sample.path}>
+                      <td>{sample.path.split(/[\\/]/).pop()}</td>
+                      <td>{sample.channels.length}</td>
+                      <td className="dim">
+                        {sample.channels
+                          .map((index) => project.channels.find((c) => c.index === index)?.name ?? `#${index}`)
+                          .join(' / ')}
+                      </td>
+                      <td className="dim path">{sample.path}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
       )}
 
       {/* ---- inventory ------------------------------------------------- */}
