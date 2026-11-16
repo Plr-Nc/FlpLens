@@ -1,0 +1,280 @@
+import { useCallback, useMemo, useRef, useState } from 'react';
+import type { Project } from '../flp/project.ts';
+import {
+  buildInventory,
+  buildSnapshot,
+  diffSnapshots,
+  parseSnapshot,
+  pluginsToCsv,
+  samplesToCsv,
+  snapshotToMarkdown,
+  type DiffEntry,
+  type Snapshot,
+} from '../flp/insight.ts';
+import { safeFileName, saveGeneratedFile } from '../components/saveFile.ts';
+
+/**
+ * Read-only inspection: what this project depends on, what it wastes, and how
+ * its channel state compares to another snapshot.
+ *
+ * None of this is possible in FL Studio without opening every channel by hand,
+ * and all of it works purely on data the parser already produced.
+ */
+export function Insight(props: { project: Project; fileName: string | null }) {
+  const { project, fileName } = props;
+  const inventory = useMemo(() => buildInventory(project), [project]);
+  const [status, setStatus] = useState('');
+  const [before, setBefore] = useState<Snapshot | null>(null);
+  const [after, setAfter] = useState<Snapshot | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const slot = useRef<'before' | 'after'>('before');
+
+  const baseName = safeFileName((fileName ?? 'project').replace(/\.flp$/i, ''), 'project');
+
+  const exportSnapshot = useCallback(
+    async (format: 'json' | 'md') => {
+      const snapshot = buildSnapshot(project, fileName);
+      const text = format === 'json' ? JSON.stringify(snapshot, null, 2) : snapshotToMarkdown(snapshot);
+      const outcome = await saveGeneratedFile(text, {
+        name: `${baseName}.snapshot.${format}`,
+        mime: format === 'json' ? 'application/json' : 'text/markdown',
+        extension: `.${format}`,
+        description: format === 'json' ? 'FlpLens 轨道状态快照' : '轨道状态清单',
+      });
+      setStatus(
+        outcome === 'cancelled'
+          ? '已取消'
+          : outcome === 'saved'
+            ? `已保存 ${format.toUpperCase()}`
+            : `已下载 ${format.toUpperCase()}`,
+      );
+    },
+    [project, fileName, baseName],
+  );
+
+  const exportCsv = useCallback(
+    async (which: 'plugins' | 'samples') => {
+      const text =
+        which === 'plugins' ? pluginsToCsv(inventory, project) : samplesToCsv(inventory, project);
+      const rows = which === 'plugins' ? inventory.plugins.length : inventory.samples.length;
+      const outcome = await saveGeneratedFile(text, {
+        name: `${baseName}.${which}.csv`,
+        mime: 'text/csv',
+        extension: '.csv',
+        description: which === 'plugins' ? '插件清单' : '采样清单',
+      });
+      setStatus(
+        outcome === 'cancelled' ? '已取消' : `已导出 ${rows} 条 ${which === 'plugins' ? '插件' : '采样'}记录`,
+      );
+    },
+    [inventory, project, baseName],
+  );
+
+  const loadSlot = (which: 'before' | 'after') => {
+    slot.current = which;
+    fileInput.current?.click();
+  };
+
+  const onPick = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    const parsed = parseSnapshot(await file.text());
+    if (!parsed) {
+      setStatus('这不是 FlpLens 的快照文件');
+      return;
+    }
+    if (slot.current === 'before') setBefore(parsed);
+    else setAfter(parsed);
+    setStatus(`已载入 ${file.name}`);
+  };
+
+  const diff: DiffEntry[] = useMemo(
+    () => (before && after ? diffSnapshots(before, after) : []),
+    [before, after],
+  );
+
+  const useCurrentAsSnapshot = (which: 'before' | 'after') => {
+    const snap = buildSnapshot(project, fileName);
+    if (which === 'before') setBefore(snap);
+    else setAfter(snap);
+    setStatus(`已把当前工程设为${
+      which === 'before' ? '「之前」' : '「之后」'
+    }`);
+  };
+
+  return (
+    <div className="panel insight">
+      <input
+        ref={fileInput}
+        type="file"
+        accept=".json,application/json"
+        style={{ display: 'none' }}
+        onChange={onPick}
+      />
+
+      {/* ---- snapshot export ------------------------------------------- */}
+      <div className="section-title">轨道状态快照</div>
+      <div className="insight-row">
+        <button onClick={() => exportSnapshot('json')}>导出 JSON</button>
+        <button onClick={() => exportSnapshot('md')}>导出清单 (Markdown)</button>
+        <button onClick={() => exportCsv('plugins')}>插件 CSV</button>
+        <button onClick={() => exportCsv('samples')}>采样 CSV</button>
+      </div>
+      <div className="insight-hint insight-hint-block">
+        快照记录每个通道的音量、声像、插件和采样，纯文本、可进 git、可跨工程比对。
+        CSV 适合拿去备份或重装系统后逐项对照。
+      </div>
+
+      {/* ---- diff ------------------------------------------------------ */}
+      <div className="section-title">工程对比</div>
+      <div className="insight-row">
+        <span className="insight-slot">
+          <b>之前</b>
+          <span className="insight-slot-name">{before ? before.file.name || before.createdAt.slice(0, 10) : '未选择'}</span>
+        </span>
+        <button onClick={() => loadSlot('before')}>载入…</button>
+        <button onClick={() => useCurrentAsSnapshot('before')}>用当前</button>
+        <span className="insight-arrow">→</span>
+        <span className="insight-slot">
+          <b>之后</b>
+          <span className="insight-slot-name">{after ? after.file.name || after.createdAt.slice(0, 10) : '未选择'}</span>
+        </span>
+        <button onClick={() => loadSlot('after')}>载入…</button>
+        <button onClick={() => useCurrentAsSnapshot('after')}>用当前</button>
+      </div>
+
+      {before && after && (
+        diff.length === 0 ? (
+          <div className="empty">两个快照完全相同</div>
+        ) : (
+          <div className="insight-diff">
+            {diff.map((entry) => (
+              <div className={`diff-row diff-${entry.kind}`} key={entry.key}>
+                <span className="diff-kind">
+                  {entry.kind === 'added' ? '新增' : entry.kind === 'removed' ? '删除' : '变动'}
+                </span>
+                <span className="diff-label">{entry.label}</span>
+                <span className="diff-before">{entry.before ?? '—'}</span>
+                <span className="diff-arrow">→</span>
+                <span className="diff-after">{entry.after ?? '—'}</span>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+
+      {/* ---- inventory ------------------------------------------------- */}
+      <div className="section-title">
+        依赖体检
+        <span className="insight-count">
+          {inventory.stats.channels} 通道 / {inventory.stats.patterns} 样式 / {inventory.stats.notes} 音符
+        </span>
+      </div>
+
+      <div className="insight-grid">
+        <Stat label="第三方插件" value={inventory.plugins.length} note="独立插件数" />
+        <Stat label="采样文件" value={inventory.samples.length} note="独立路径数" />
+        <Stat
+          label="空样式"
+          value={inventory.unusedPatterns.length}
+          note="无音符且无引用"
+          warn={inventory.unusedPatterns.length > 0}
+        />
+        <Stat
+          label="闲置通道"
+          value={inventory.orphanChannels.length}
+          note="无音符、无片段"
+          warn={inventory.orphanChannels.length > 0}
+        />
+        <Stat
+          label="重复采样"
+          value={inventory.duplicatedSamples.length}
+          note="同一样本多次加载"
+          warn={inventory.duplicatedSamples.length > 0}
+        />
+        <Stat
+          label="无声样式"
+          value={inventory.silentPatterns.length}
+          note="有引用但没音符"
+          warn={inventory.silentPatterns.length > 0}
+        />
+      </div>
+
+      {inventory.plugins.length > 0 && (
+        <>
+          <div className="section-title">插件清单（{inventory.plugins.length}）</div>
+          <div className="insight-table">
+            <div className="insight-thead">
+              <span>插件</span>
+              <span>厂商</span>
+              <span>通道</span>
+            </div>
+            {inventory.plugins.map((plugin) => (
+              <div className="insight-trow" key={`${plugin.name}|${plugin.vendor}`}>
+                <span title={plugin.path}>{plugin.name}</span>
+                <span className="dim">{plugin.vendor || '未知'}</span>
+                <span className="dim">{plugin.channels.length} 个</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {inventory.duplicatedSamples.length > 0 && (
+        <>
+          <div className="section-title">重复加载的采样（{inventory.duplicatedSamples.length}）</div>
+          <div className="insight-table">
+            {inventory.duplicatedSamples.map((sample) => (
+              <div className="insight-trow" key={sample.path}>
+                <span title={sample.path}>{sample.path.split(/[\\/]/).pop()}</span>
+                <span className="dim">{sample.channels.length} 个通道</span>
+                <span className="dim" title={sample.path}>
+                  {sample.path}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {inventory.orphanChannels.length > 0 && (
+        <>
+          <div className="section-title">闲置通道（{inventory.orphanChannels.length}）</div>
+          <div className="insight-chips">
+            {inventory.orphanChannels.map((channel) => (
+              <span className="insight-chip" key={channel.index}>
+                {channel.name} <em>{channel.kind}</em>
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+
+      {inventory.unusedPatterns.length > 0 && (
+        <>
+          <div className="section-title">空样式（{inventory.unusedPatterns.length}）</div>
+          <div className="insight-chips">
+            {inventory.unusedPatterns.map((pattern) => (
+              <span className="insight-chip" key={pattern.index}>
+                {pattern.name || `样式 ${pattern.index + 1}`}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+
+      {status && <div className="insight-status">{status}</div>}
+    </div>
+  );
+}
+
+function Stat(props: { label: string; value: number; note: string; warn?: boolean }) {
+  return (
+    <div className={'insight-stat' + (props.warn ? ' warn' : '')}>
+      <div className="label">{props.label}</div>
+      <div className="value">{props.value}</div>
+      <div className="note">{props.note}</div>
+    </div>
+  );
+}

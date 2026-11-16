@@ -6,11 +6,12 @@ import { ChannelList, Overview } from './views/Panels.tsx';
 import { Arrangement } from './views/Arrangement.tsx';
 import { StyleView } from './views/StyleView.tsx';
 import { Mixer } from './views/Mixer.tsx';
+import { Insight } from './views/Insight.tsx';
 import { Browser } from './views/Browser.tsx';
 import { SplitPane } from './components/SplitPane.tsx';
 import { Settings } from './components/Settings.tsx';
 
-type Tab = 'arrangement' | 'style' | 'mixer' | 'overview' | 'diagnostics';
+type Tab = 'arrangement' | 'style' | 'mixer' | 'insight' | 'overview' | 'diagnostics';
 
 export function App() {
   const [project, setProject] = useState<Project | null>(null);
@@ -239,6 +240,9 @@ export function App() {
               <button className={tab === 'mixer' ? 'active' : ''} onClick={() => setTab('mixer')}>
                 混音台
               </button>
+              <button className={tab === 'insight' ? 'active' : ''} onClick={() => setTab('insight')}>
+                体检
+              </button>
               <button className={tab === 'overview' ? 'active' : ''} onClick={() => setTab('overview')}>
                 信息
               </button>
@@ -269,6 +273,8 @@ export function App() {
                 </select>
               )}
             </div>
+
+            {tab === 'insight' && <Insight project={project} fileName={fileName} />}
 
             {tab === 'overview' && <Overview project={project} fileName={fileName} />}
 

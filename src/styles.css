@@ -2043,3 +2043,239 @@ footer {
 .tl-content {
   min-width: calc(100% + 160px);
 }
+
+/* ---------- insight (inventory · snapshot · diff) ---------- */
+
+.insight {
+  overflow: auto;
+}
+
+.insight-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.insight-hint {
+  color: var(--faint);
+  font-size: calc(10.5px * var(--font-scale));
+  margin-left: 4px;
+}
+
+.insight-slot {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  font-size: calc(11px * var(--font-scale));
+}
+
+.insight-slot b {
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.insight-slot-name {
+  color: var(--muted);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insight-arrow {
+  color: var(--faint);
+  padding: 0 2px;
+}
+
+.insight-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.insight-stat {
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  box-shadow: inset 0 1px 0 var(--highlight);
+}
+
+.insight-stat.warn {
+  border-color: rgba(232, 163, 61, 0.4);
+}
+
+.insight-stat .label {
+  font-size: calc(10px * var(--font-scale));
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.insight-stat .value {
+  font-size: calc(20px * var(--font-scale));
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+  color: var(--text);
+}
+
+.insight-stat.warn .value {
+  color: var(--warn);
+}
+
+.insight-stat .note {
+  font-size: calc(10px * var(--font-scale));
+  color: var(--faint);
+}
+
+.insight-count {
+  margin-left: auto;
+  font-size: calc(10px * var(--font-scale));
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.insight-table {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+
+.insight-thead,
+.insight-trow {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 0.7fr;
+  gap: 10px;
+  padding: 5px 11px;
+  font-size: calc(11.5px * var(--font-scale));
+}
+
+.insight-thead {
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: calc(10px * var(--font-scale));
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid var(--line);
+}
+
+.insight-trow:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.016);
+}
+
+.insight-trow > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insight-trow .dim {
+  color: var(--muted);
+}
+
+.insight-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.insight-chip {
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-2);
+  font-size: calc(11px * var(--font-scale));
+  color: var(--text-dim);
+}
+
+.insight-chip em {
+  color: var(--faint);
+  font-style: normal;
+  font-size: calc(10px * var(--font-scale));
+}
+
+.insight-diff {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+
+.diff-row {
+  display: grid;
+  grid-template-columns: 46px 1.6fr 1fr 16px 1fr;
+  gap: 8px;
+  align-items: baseline;
+  padding: 5px 11px;
+  font-size: calc(11.5px * var(--font-scale));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.diff-row:last-child {
+  border-bottom: none;
+}
+
+.diff-kind {
+  font-size: calc(9.5px * var(--font-scale));
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.diff-added .diff-kind {
+  color: var(--audio);
+}
+
+.diff-removed .diff-kind {
+  color: var(--danger);
+}
+
+.diff-changed .diff-kind {
+  color: var(--warn);
+}
+
+.diff-label {
+  color: var(--text-dim);
+}
+
+.diff-before {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: rgba(224, 92, 92, 0.5);
+}
+
+.diff-after {
+  color: var(--text);
+}
+
+.diff-arrow {
+  color: var(--faint);
+  text-align: center;
+}
+
+.insight-status {
+  margin-top: 10px;
+  padding: 6px 11px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--text-dim);
+  font-size: calc(11px * var(--font-scale));
+}
+
+.insight-hint-block {
+  display: block;
+  margin: -4px 0 14px;
+  line-height: 1.55;
+}
