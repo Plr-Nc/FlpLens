@@ -14,6 +14,8 @@
 
 ![混音台](docs/screenshot-mixer.png)
 
+![体检](docs/screenshot-insight.png)
+
 ---
 
 ## 支持范围
