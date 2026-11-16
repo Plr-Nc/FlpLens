@@ -11,6 +11,7 @@ import {
   type Snapshot,
 } from '../flp/insight.ts';
 import { safeFileName, saveGeneratedFile } from '../components/saveFile.ts';
+import { Disclosure } from './Disclosure.tsx';
 
 /**
  * Read-only inspection: what this project depends on, what it wastes, and how
@@ -112,6 +113,7 @@ export function Insight(props: { project: Project; fileName: string | null }) {
         onChange={onPick}
       />
 
+      <Disclosure title="这个页面回答什么" defaultOpen={false} meta="点开看说明">
       <div className="insight-intro">
         <b>这个页面回答三个问题</b>
         <ol>
@@ -131,9 +133,10 @@ export function Insight(props: { project: Project; fileName: string | null }) {
           </li>
         </ol>
       </div>
+      </Disclosure>
 
       {/* ---- snapshot export ------------------------------------------- */}
-      <div className="section-title">轨道状态快照</div>
+      <Disclosure title="轨道状态快照" defaultOpen meta="JSON / Markdown">
       <div className="insight-row">
         <button onClick={() => exportSnapshot('json')}>导出 JSON</button>
         <button onClick={() => exportSnapshot('md')}>导出清单 (Markdown)</button>
@@ -150,9 +153,10 @@ export function Insight(props: { project: Project; fileName: string | null }) {
         快照记录每个通道的音量、声像、插件和采样，纯文本、可进 git、可跨工程比对。
         明细可以直接在下面查看，不需要导出文件。
       </div>
+      </Disclosure>
 
       {/* ---- diff ------------------------------------------------------ */}
-      <div className="section-title">工程对比</div>
+      <Disclosure title="工程对比" defaultOpen meta={before && after ? `${diff.length} 处差异` : '选两个 .flp'}>
       <div className="insight-row">
         <span className="insight-slot">
           <b>之前</b>
@@ -188,12 +192,17 @@ export function Insight(props: { project: Project; fileName: string | null }) {
           </div>
         )
       )}
+      </Disclosure>
 
       {/* ---- inline preview ---------------------------------------------
           The same rows the table below summarises, rendered directly so the
           data can be checked without any file round-trip. */}
       {preview && (
-        <>
+        <Disclosure
+          title="明细清单"
+          defaultOpen
+          meta={preview === 'plugins' ? '插件与设备' : '采样文件'}
+        >
           <div className="section-title">
             {preview === 'plugins'
               ? `插件与设备（${
@@ -301,17 +310,15 @@ export function Insight(props: { project: Project; fileName: string | null }) {
               </table>
             )}
           </div>
-        </>
+        </Disclosure>
       )}
 
       {/* ---- inventory ------------------------------------------------- */}
-      <div className="section-title">
-        依赖体检
-        <span className="insight-count">
-          {inventory.stats.channels} 通道 / {inventory.stats.patterns} 样式 / {inventory.stats.notes} 音符
-        </span>
-      </div>
-
+      <Disclosure
+        title="依赖体检"
+        defaultOpen
+        meta={`${inventory.stats.channels} 通道 / ${inventory.stats.patterns} 样式 / ${inventory.stats.notes} 音符`}
+      >
       <div className="insight-grid">
         <Stat
           label="插件与设备"
@@ -348,30 +355,14 @@ export function Insight(props: { project: Project; fileName: string | null }) {
           warn={inventory.silentPatterns.length > 0}
         />
       </div>
-
-      {inventory.plugins.length > 0 && (
-        <>
-          <div className="section-title">插件清单（{inventory.plugins.length}）</div>
-          <div className="insight-table">
-            <div className="insight-thead">
-              <span>插件</span>
-              <span>厂商</span>
-              <span>通道</span>
-            </div>
-            {inventory.plugins.map((plugin) => (
-              <div className="insight-trow" key={`${plugin.name}|${plugin.vendor}`}>
-                <span title={plugin.path}>{plugin.name}</span>
-                <span className="dim">{plugin.vendor || '未知'}</span>
-                <span className="dim">{plugin.channels.length} 个</span>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
+      </Disclosure>
 
       {inventory.duplicatedSamples.length > 0 && (
-        <>
-          <div className="section-title">重复加载的采样（{inventory.duplicatedSamples.length}）</div>
+        <Disclosure
+          title="重复加载的采样"
+          defaultOpen={false}
+          meta={`${inventory.duplicatedSamples.length} 组`}
+        >
           <div className="insight-table">
             {inventory.duplicatedSamples.map((sample) => (
               <div className="insight-trow" key={sample.path}>
@@ -383,12 +374,15 @@ export function Insight(props: { project: Project; fileName: string | null }) {
               </div>
             ))}
           </div>
-        </>
+        </Disclosure>
       )}
 
       {inventory.orphanChannels.length > 0 && (
-        <>
-          <div className="section-title">闲置通道（{inventory.orphanChannels.length}）</div>
+        <Disclosure
+          title="闲置通道"
+          defaultOpen={false}
+          meta={`${inventory.orphanChannels.length} 个`}
+        >
           <div className="insight-chips">
             {inventory.orphanChannels.map((channel) => (
               <span className="insight-chip" key={channel.index}>
@@ -396,12 +390,11 @@ export function Insight(props: { project: Project; fileName: string | null }) {
               </span>
             ))}
           </div>
-        </>
+        </Disclosure>
       )}
 
       {inventory.unusedPatterns.length > 0 && (
-        <>
-          <div className="section-title">空样式（{inventory.unusedPatterns.length}）</div>
+        <Disclosure title="空样式" defaultOpen={false} meta={`${inventory.unusedPatterns.length} 个`}>
           <div className="insight-chips">
             {inventory.unusedPatterns.map((pattern) => (
               <span className="insight-chip" key={pattern.index}>
@@ -409,7 +402,7 @@ export function Insight(props: { project: Project; fileName: string | null }) {
               </span>
             ))}
           </div>
-        </>
+        </Disclosure>
       )}
 
       {status && <div className="insight-status">{status}</div>}
